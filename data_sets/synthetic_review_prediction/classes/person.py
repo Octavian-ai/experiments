@@ -6,9 +6,8 @@ from .nano_type import NanoID, NanoType
 class PersonID(GraphNodeIdentifier):
     LABEL = NodeLabel('PERSON')
 
-    def __init__(self, _id: T):
+    def __init__(self, _id: UUID):
         super().__init__(self.LABEL, _id)
-
 
 
 class PersonStylePreferenceEnum(object):
@@ -35,4 +34,3 @@ class Person(GraphNode[PersonID]):
         super(Person, self).__init__(person_id, is_golden)
         self.style_preference = style_preference
         self.meta_properties = meta_properties
-

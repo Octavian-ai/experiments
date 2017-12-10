@@ -1,10 +1,13 @@
 from uuid import UUID, uuid4
-from .graph_node import GraphNode, IsGoldenFlag
+from .graph_node import NodeLabel, GraphNodeIdentifier, GraphNode, IsGoldenFlag
 from .nano_type import NanoType, NanoID
 
 
-class ProductID(NanoID):
-    pass
+class ProductID(GraphNodeIdentifier):
+    LABEL = NodeLabel('PRODUCT')
+
+    def __init__(self, _id: UUID):
+        super().__init__(self.LABEL, _id)
 
 
 class Product(GraphNode[ProductID]):

@@ -1,18 +1,10 @@
 from typing import Generic, TypeVar
 from .nano_type import NanoType
 from .graph_node import GraphNode
+from .golden_flag import IsGoldenFlag
 
 T_from = TypeVar('T_from', GraphNode)
 T_to = TypeVar('T_to', GraphNode)
-
-
-class IsGoldenFlag(object):
-    def __init__(self, value: bool):
-        self._value = value
-
-    @property
-    def value(self):
-        return self._value
 
 
 class EdgeType(NanoType[str]):

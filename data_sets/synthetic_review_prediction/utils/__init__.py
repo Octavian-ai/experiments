@@ -1,1 +1,1 @@
-from .weighted_option import WeightedOption, choose_weighted_option, get_average_value
+from .weighted_option import WeightedOption, choose_weighted_option, get_average_value, Distribution

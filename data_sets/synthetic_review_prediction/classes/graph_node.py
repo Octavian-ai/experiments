@@ -1,18 +1,10 @@
 from typing import Generic, TypeVar
 from .nano_type import NanoType, NanoID
+from .golden_flag import IsGoldenFlag
 
 from uuid import UUID
 
 T = TypeVar('T')
-
-
-class IsGoldenFlag(object):
-    def __init__(self, value: bool):
-        self._value = value
-
-    @property
-    def value(self):
-        return self._value
 
 
 class NodeLabel(NanoType[str]):
@@ -25,17 +17,17 @@ class GraphNodeIdentifier(NanoID):
         self.label = label
 
 
-T_gni = TypeVar('T_gni', GraphNodeIdentifier)
+T_gni = TypeVar('T_gni', GraphNodeIdentifier, covariant=True)
 
 
-class GraphNode(Generic[T]):
+class GraphNode(Generic[T_gni]):
     def __init__(self, _id: T_gni, is_golden: IsGoldenFlag):
-        self._id = _id
+        self._id: T_gni = _id
         self.is_golden = is_golden
 
     @property
-    def id(self) -> T:
-        return self._id.id
+    def id(self) -> T_gni:
+        return self._id
 
     @property
     def label(self) -> NodeLabel:

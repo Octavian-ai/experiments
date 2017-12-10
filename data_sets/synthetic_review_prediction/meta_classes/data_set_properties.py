@@ -1,15 +1,29 @@
 import math
 from typing import List
-from ..utils import WeightedOption, choose_weighted_option, get_average_value
+from ..utils import WeightedOption, choose_weighted_option, get_average_value, Distribution
 from ..classes import PersonStylePreferenceEnum, ProductStyleEnum
+
+
+class PersonStyleWeight(WeightedOption[PersonStylePreferenceEnum]):
+    pass
+
+
+class ProductStyleWeight(WeightedOption[ProductStyleEnum]):
+    pass
+
+
+class PersonStyleWeightDistribution(Distribution[PersonStyleWeight]):
+    def __init__(self, one: PersonStyleWeight):
+        super().__init__([one])
+
 
 class DataSetProperties(object):
     def __init__(self,
                  n_reviews: int,
                  reviews_per_product: float,
                  reviews_per_person_distribution: List[WeightedOption[int]],
-                 person_styles_distribution: List[WeightedOption[PersonStylePreferenceEnum]],
-                 product_styles_distribution: List[WeightedOption[ProductStyleEnum]]
+                 person_styles_distribution: PersonStyleWeightDistribution,
+                 product_styles_distribution: Distribution[ProductStyleWeight]
                  ):
         self.product_styles_distribution = product_styles_distribution
         self.person_styles_distribution = person_styles_distribution

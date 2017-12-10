@@ -1,40 +1,33 @@
-from uuid import UUID, uuid4
-from .graph_edge import GraphEdge
+from uuid import UUID
+from .golden_flag import IsGoldenFlag
+from .graph_node import GraphNode, GraphNodeIdentifier, NodeLabel
+from .person import PersonID
+from .product import ProductID
 from .nano_type import NanoType
-from .person import Person
-from .product import Product
-
-class Review(GraphEdge[]):
-
-    @classmethod
-    def new_random(cls):
-        return ProductID(uuid4())
 
 
-class Product(GraphNode[ProductID]):
-    def __init__(self,
-                 product_id: ProductID,
-                 is_golden: IsGoldenFlag,
-                 style: ProductStyle
-                 ):
-        super(Product, self).__init__(product_id, is_golden)
-        self.style = style
+class ReviewID(GraphNodeIdentifier):
+    LABEL = NodeLabel('REVIEW')
+
+    def __init__(self, _id: UUID):
+        super(ReviewID, self).__init__(self.LABEL, _id)
 
 
-class ProductStyleEnum(object):
-    def __init__(self):
-        pass
-
-    @classmethod
-    def parse(cls, name: str):
-        candidate = getattr(cls, name.upper())
-        assert isinstance(candidate, cls)
-        return candidate
-
-
-ProductStyleEnum.LIKES_A: ProductStyleEnum()
-ProductStyleEnum.LIKES_B: ProductStyleEnum()
-
-
-class ProductStyle(NanoType[ProductStyleEnum]):
+class ReviewScore(NanoType(float)):
     pass
+
+
+class Review(GraphNode[ReviewID]):
+    def __init__(self,
+                 review_id: ReviewID,
+                 is_golden: IsGoldenFlag,
+                 score: ReviewScore,
+                 by_person: PersonID,
+                 of_product: ProductID
+                 ):
+        super(Review, self).__init__(review_id, is_golden)
+        self.by_person = by_person
+        self.of_product = of_product
+        self.score = score
+
+

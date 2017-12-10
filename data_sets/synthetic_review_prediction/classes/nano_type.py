@@ -29,6 +29,7 @@ class NanoType(Generic[T]):
 
 
 class NanoID(NanoType[UUID]):
+
     @classmethod
     def new_random(cls):
         return cls(uuid4())
