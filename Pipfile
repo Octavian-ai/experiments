@@ -9,6 +9,7 @@ name = "pypi"
 
 "neo4j-driver" = "*"
 tensorflow = "*"
+keras = "*"
 
 
 [dev-packages]
