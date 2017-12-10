@@ -33,12 +33,12 @@ We will generate different data sets to qualitatively investigate different ML a
 
 ## Evaluation Tasks
 
-We are interested in three different evaluation tasks depending on whether the person or product is included in the training set or not:
+We are interested in four different evaluation tasks depending on whether the person or product is included in the training set or not:
 
-new product == unknown at training time i.e. not in training set or validation set
-new person == unknown at training time i.e. not in training set or validation set
-existing product == known at training time i.e. present in training set
-existing person == known at training time i.e. present in training set
+- **new product == unknown** at training time i.e. not in training set or validation set
+- **new person == unknown** at training time i.e. not in training set or validation set
+- **existing product == known** at training time i.e. present in training set
+- **existing person == known** at training time i.e. present in training set
 
 The evaluation tasks we are interested in are, how well can you predict the person's review? Given:
 
@@ -50,41 +50,42 @@ The evaluation tasks we are interested in are, how well can you predict the pers
 
 ## Approach
 
-Although we have a synthetic system for which we can generate more data we want to get into good habits for working with "real" data. So we will attempt to blind the ML system to the fact that we are working with synthetic data and not rely on our ability to generate more information at will. 
-So it will be the responsibility of the ML part of the system to split the data into Test / Train and Validation sets. However for each data set that we generate we will keep back a small portion to make up a "hidden" or "golden" test set which is only to be used at the very end of the investigation to provide a "double check" on the performance of different models.
+Although we have a synthetic system for which we can generate more data we want to get into good habits for working with "real" data. So we will attempt to blind the ML system to the fact that we are working with synthetic data and not rely on our ability to generate more information at will.
 
-Because of the three different evaluation tasks it will be necessary for us to keep back three different golden test sets:
+It will be the responsibility of the ML part of the system to split the data into Test / Train and Validation sets. However for each data set that we generate we will keep back a small portion to make up a "golden" test set which is only to be used at the very end of our investigation. This is to perform a final test of the ML predictor, one which we haven't had the opportunity to optimise the meta-parameters for.
 
-Note: Since we don't know exactly how the training/validation/test split will be carried out we will generate excessive numbers for data sets used in 'existing data' cases
+Because of the three different evaluation tasks it will be necessary for us to keep back three different golden test sets, of a large enough size to test the system regardless of the test/training split. We will keep the following volumes of golden test data:
 
 1) INDEPENDENT: A completely independent data set containing 1000 reviews
-1) NEW_PEOPLE: new people + their reviews of existing products containing approx 2000 reviews
-1) NEW_PRODUCTS: new products + reviews of them by existing people containing approx 2000 reviews
-1) EXISTING: 2000 additional reviews between existing people and products.
+2) NEW_PEOPLE: new people + their reviews of existing products containing approx 2000 reviews
+3) NEW_PRODUCTS: new products + reviews of them by existing people containing approx 2000 reviews
+4) EXISTING: 2000 additional reviews between existing people and products.
 
 
 
 # The Data Sets
 
+## Data Set 1: A simple binary preference system
 
-## Data Set 1: The simplest situation that Andrew considers to be interesting 
+Products have a binary style and people have a binary preference.
 
 - All variables will be 'public' in the data set
 
 
 ### Product Style
-- _style_ will be categorical with two mutually exclusive elements (A and B).
+- _product_style_ will be categorical with two mutually exclusive elements (A and B).
 - The distribution of product styles will be uniform i.e. Approx 50% of products will have style A and 50% will have style B.
 
 
 ### Style Preference
-- _style_preference_ will be categorical with two mutually exclusive elements (likes_A_dislikes_B | likes_B_dislikes_A ).
+- _person_style_preference_ will be categorical with two mutually exclusive elements (likes_A_dislikes_B | likes_B_dislikes_A ).
 - The distribution of product styles will be uniform i.e. Approx 50% of people will like style A and 50% will like style B.
 
 
 ### Reviews and Opinion Function
 - _review_score_ will be boolean (1 for a positive review and 0 for a negative review)
 - Each person will have made either 1 or 2 reviews. The mean number of reviews-per-person will be approx 1.5 i.e. approx 50% will have made 2 reviews and 50% will have made 1 review. 
+- _review_score_ is the dot product of the _product_style_ and _person_style_preference_ normalised to the range of 0 to 1
 
 Note: having people with 0 reviews would be useless since you cannot train or validate/test using them.
  
