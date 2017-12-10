@@ -16,8 +16,7 @@ class GraphNodeIdentifier(NanoID):
         super().__init__(_id)
         self.label = label
 
-
-T_gni = TypeVar('T_gni', GraphNodeIdentifier, covariant=True)
+T_gni = TypeVar('T_gni',  bound=GraphNodeIdentifier, covariant=True)
 
 
 class GraphNode(Generic[T_gni]):

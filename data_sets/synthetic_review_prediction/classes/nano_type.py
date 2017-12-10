@@ -16,19 +16,23 @@ class NanoType(Generic[T]):
         return self._value.__hash__()
 
     def __eq__(self, other):
-        return self._value.__eq__()
+        return self._value.__eq__(other)
 
     def __ne__(self, other):
-        return self._value.__ne__()
+        return self._value.__ne__(other)
 
     def __gt__(self, other):
-        return self._value.__gt__()
+        return self._value.__gt__(other)
 
     def __lt__(self, other):
-        return self._value.__lt__()
+        return self._value.__lt__(other)
 
 
 class NanoID(NanoType[UUID]):
+
+    @property
+    def id(self) -> NanoType:
+        return self
 
     @classmethod
     def new_random(cls):

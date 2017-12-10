@@ -13,7 +13,7 @@ class ReviewID(GraphNodeIdentifier):
         super(ReviewID, self).__init__(self.LABEL, _id)
 
 
-class ReviewScore(NanoType(float)):
+class ReviewScore(NanoType[float]):
     pass
 
 

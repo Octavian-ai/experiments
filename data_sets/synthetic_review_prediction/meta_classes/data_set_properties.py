@@ -12,9 +12,8 @@ class ProductStyleWeight(WeightedOption[ProductStyleEnum]):
     pass
 
 
-class PersonStyleWeightDistribution(Distribution[PersonStyleWeight]):
-    def __init__(self, one: PersonStyleWeight):
-        super().__init__([one])
+class PersonStyleWeightDistribution(Distribution[PersonStyleWeight, PersonStylePreferenceEnum]):
+    pass
 
 
 class DataSetProperties(object):
@@ -23,7 +22,7 @@ class DataSetProperties(object):
                  reviews_per_product: float,
                  reviews_per_person_distribution: List[WeightedOption[int]],
                  person_styles_distribution: PersonStyleWeightDistribution,
-                 product_styles_distribution: Distribution[ProductStyleWeight]
+                 product_styles_distribution: Distribution[ProductStyleWeight, ProductStyleEnum]
                  ):
         self.product_styles_distribution = product_styles_distribution
         self.person_styles_distribution = person_styles_distribution

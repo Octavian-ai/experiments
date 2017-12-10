@@ -12,12 +12,16 @@ class WeightedOption(Generic[T__]):
         self.option = option
 
 
-T_w = TypeVar('T_w')
+T_w = TypeVar('T_w', bound=WeightedOption[T__])
 
 
-class Distribution(Generic[T_w]):
-    def __init__(self, *vals: T_w):
-        self.list = list(vals)
+class Distribution(Generic[T_w, T__]):
+    def __init__(self, entries: List[T_w]):
+        self.list = list(entries)
+
+    def __getitem__(self, index):
+        result = self.list[index]
+        return result
 
 
 T_ = TypeVar('T_')
