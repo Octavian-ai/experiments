@@ -1,24 +1,36 @@
 
 import collections
+import random
 
 from graph_io import *
 
 class Dataset(object):
 
-	def __init__(self, data, x, y):
+	def __init__(self, params, data, x, y):
+		self.params = params
 		self.data = data
 		self.data_x = x
 		self.data_y = y
 
+		for r in self.data:
+			print(r)
+
 		for r in self.data_x:
 			print(r)
 
-		self.input_shape = (1,2,3,4)
+		self.input_shape = (2)
+
+		random.seed(params.random_seed)
+
+		def data_dest():
+			r = random.random()
+			if r > 0.9: return "test"
+			elif r > 0.8: return "validate"
+			else: return "train"
 
 		self.train = {}
-		self.test = {}
 		self.validate = {}
-
+		self.test = {}
 
 	@staticmethod
 	def generate(params):
@@ -36,11 +48,11 @@ class Dataset(object):
 				
 				'simple': Recipe(
 						"""MATCH p=
-								(a:PERSON {isGolden:false}) 
-									-[:WROTE {isGolden:false}]-> 
-								(b:REVIEW {isGolden:false}) 
-									-[:OF {isGolden:false}]-> 
-								(c:PRODUCT {isGolden:false})
+								(a:PERSON {is_golden:false}) 
+									-[:WROTE {is_golden:false}]-> 
+								(b:REVIEW {is_golden:false}) 
+									-[:OF {is_golden:false}]-> 
+								(c:PRODUCT {is_golden:false})
 							RETURN a.style_preference, c.style, b.score
 							LIMIT 1000
 						""",
@@ -54,7 +66,7 @@ class Dataset(object):
 			x = map(recipe.get_x, data)
 			y = map(recipe.get_y, data)
 
-			return Dataset(data, x, y)
+			return Dataset(params, data, x, y)
 		
 
 

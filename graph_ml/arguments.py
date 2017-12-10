@@ -10,6 +10,7 @@ class Arguments(object):
 
 		parser.add_argument('--batch_size', type=int, default=100)
 		parser.add_argument('--epochs', type=int, default=5)
+		parser.add_argument('--random-seed', type=int, default=13)
 
 		parser.add_argument('--output-dir', type=str, default="./output")
 		parser.add_argument('--data-dir', type=str, default="./data")
