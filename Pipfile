@@ -10,6 +10,7 @@ name = "pypi"
 "neo4j-driver" = "*"
 tensorflow = "*"
 keras = "*"
+numpy = "*"
 
 
 [dev-packages]

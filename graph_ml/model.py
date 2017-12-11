@@ -10,11 +10,14 @@ class Model(object):
 	def generate(params, dataset):
 
 		if params.experiment == "simple":
-			num_classes = 2
 
 			model = Sequential()
-			model.add(Dense(input_shape=dataset.input_shape, 10, activation='relu'))
+			model.add(Dense(10, input_shape=dataset.input_shape, activation='relu'))
 			model.add(Dropout(0.5))
-			model.add(Dense(num_classes, activation='softmax'))
+			model.add(Dense(1, activation='relu'))
+
+			model.compile(loss=keras.losses.mean_squared_error,
+				optimizer=keras.optimizers.Adadelta(),
+				metrics=['accuracy'])
 
 			return model
