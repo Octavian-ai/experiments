@@ -1,8 +1,7 @@
 
 import keras
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, Flatten
-from keras.layers import Conv2D, MaxPooling2D
+from keras.layers import *
 
 class Model(object):
 
@@ -11,13 +10,15 @@ class Model(object):
 
 		if params.experiment == "simple":
 
-			model = Sequential()
-			model.add(Dense(4, input_shape=dataset.input_shape, activation='relu'))
-			model.add(Dropout(0.01))
-			model.add(Dense(1))
+			model = Sequential([
+				Dense(8, 
+					input_shape=dataset.input_shape,
+					activation='softmax'),
+				Dense(1, activation='sigmoid'),
+			])
 
 			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.Adam(),
+				optimizer=keras.optimizers.SGD(lr=0.3),
 				metrics=['accuracy'])
 
 		return model

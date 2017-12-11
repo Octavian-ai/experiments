@@ -1,6 +1,8 @@
 
 import collections
 import random
+import pickle
+import os.path
 
 import keras
 import numpy as np
@@ -11,7 +13,7 @@ import neo4j
 
 from graph_io import *
 
-Recipe = collections.namedtuple('Recipe', ['query', 'hashing', 'split'])
+
 
 class Point(object):
 	def __init__(self, x, y):
@@ -28,6 +30,69 @@ class Point(object):
 
 class Dataset(object):
 
+	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
+	# This performs all transformations in-memory - it is not very efficient
+	@staticmethod
+	def generate(params):
+		with SimpleNodeClient() as client:
+			
+			Recipe = collections.namedtuple('Recipe', ['query', 'params', 'hashing', 'split'])
+
+			recipes = {
+				'simple': Recipe(
+						"""MATCH p=
+								(a:PERSON {is_golden:{golden}}) 
+									-[:WROTE {is_golden:{golden}}]-> 
+								(b:REVIEW {is_golden:{golden}}) 
+									-[:OF {is_golden:{golden}}]-> 
+								(c:PRODUCT {is_golden:{golden}})
+							RETURN a.style_preference AS preference, c.style AS style, b.score AS score
+							LIMIT 10000000
+						""",
+						QueryParams(golden=params.golden),
+						{'preference':4, 'style':4},
+						lambda row, hashed: Point(np.concatenate((hashed['preference'], hashed['style'])), row['score'])
+					)
+			}
+
+			recipe = recipes[params.experiment]
+			data = client.execute_cypher(CypherQuery(recipe.query), recipe.params)
+
+			# Once I get my shit together,
+			# 1) use iterators
+			# 2) move to streaming
+			# 3) move to hdf5
+
+			data = list(data) # so we can do a few passes
+
+			if len(data) == 0:
+				raise Exception('Neo4j query returned no data, cannot train the network') 
+
+			if params.verbose > 0:
+				print("Retrieved {} rows from Neo4j".format(len(data)))
+				print("Data sample: ", data[:10])
+
+			hashing = Dataset.hash_statement_result(data, recipe.hashing)
+
+			xy = [recipe.split(*i) for i in zip(data, hashing)]
+
+			return Dataset(params, data, xy)
+
+	@staticmethod
+	def lazy_generate(params):
+
+		dataset_file = os.path.join(params.data_dir + '/' + params.experiment + '.pkl')
+
+		if os.path.isfile(dataset_file):
+			return pickle.load(open(dataset_file, "rb"))
+
+		else:
+			d = Dataset.generate(params)
+			pickle.dump(d, open(dataset_file, "wb"))
+			return d
+		
+
+	# Split data into test/train set, organise it into a class
 	def __init__(self, params, data, xy):
 		self.params = params
 		self.data = data
@@ -38,7 +103,8 @@ class Dataset(object):
 		self.train = Point([], [])
 		self.test = Point([], [])
 
-		random.seed(params.random_seed)
+		if params.random_seed is not None:
+			random.seed(params.random_seed)
 
 		def store_datum(i):
 			r = random.random()
@@ -100,45 +166,7 @@ class Dataset(object):
 
 
 
-	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
-	# This performs all transformations in-memory - it is not very efficient
-	@staticmethod
-	def generate(params):
-		with SimpleNodeClient() as client:
-			query_params = QueryParams()
-
-			recipies = {
-				'simple': Recipe(
-						"""MATCH p=
-								(a:PERSON {is_golden:false}) 
-									-[:WROTE {is_golden:false}]-> 
-								(b:REVIEW {is_golden:false}) 
-									-[:OF {is_golden:false}]-> 
-								(c:PRODUCT {is_golden:false})
-							RETURN a.style_preference AS preference, c.style AS style, b.score AS score
-							LIMIT 10000000
-						""",
-						{'preference':4, 'style':4},
-						lambda row, hashed: Point(np.concatenate((hashed['preference'], hashed['style'])), row['score'])
-					)
-			}
-
-			recipe = recipies[params.experiment]
-			data = client.execute_cypher(CypherQuery(recipe.query), query_params)
-			data = list(data) # so we can do a few passes
-			hashing = Dataset.hash_statement_result(data, recipe.hashing)
-
-			if params.verbose > 0:
-				print("Data sample: ", data[:10])
-
-			# Once I get my shit together,
-			# 1) use iterators
-			# 2) move to streaming
-			# 3) move to hdf5
-			xy = [recipe.split(*i) for i in zip(data, hashing)]
-
-			return Dataset(params, data, xy)
-		
+	
 
 
 
