@@ -12,12 +12,12 @@ class Model(object):
 		if params.experiment == "simple":
 
 			model = Sequential()
-			model.add(Dense(10, input_shape=dataset.input_shape, activation='relu'))
-			model.add(Dropout(0.5))
-			model.add(Dense(1, activation='relu'))
+			model.add(Dense(4, input_shape=dataset.input_shape, activation='relu'))
+			model.add(Dropout(0.01))
+			model.add(Dense(1))
 
 			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.Adadelta(),
+				optimizer=keras.optimizers.Adam(),
 				metrics=['accuracy'])
 
-			return model
+		return model

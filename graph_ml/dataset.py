@@ -35,10 +35,7 @@ class Dataset(object):
 
 		self.input_shape = (len(xy[0].x),)
 
-
-		## Split data up into train/validate/test
 		self.train = Point([], [])
-		self.validate = Point([], [])
 		self.test = Point([], [])
 
 		random.seed(params.random_seed)
@@ -47,18 +44,22 @@ class Dataset(object):
 			r = random.random()
 			if r > 0.9:
 				self.test.append(i)
-			elif r > 0.8:
-				self.validate.append(i)
 			else:
 				self.train.append(i)
 
 		for i in self.data_xy:
 			store_datum(i)
 
-		# print("Train", self.train)
-		# print("validate", self.validate)
-		print("test", self.test)
+		# Yuck. fix later.
+		self.train.x = np.array(self.train.x)
+		self.train.y = np.array(self.train.y)
 
+		self.test.x = np.array(self.test.x)
+		self.test.y = np.array(self.test.y)
+		
+		if params.verbose > 0:
+			print("Test data sample: ", list(zip(self.test.x, self.test.y))[:10])
+		
 
 	# Transforms neo4j results into a hashed version with the same key structure
 	# Does not guarantee same hashing scheme used for each column, or for each run
@@ -80,7 +81,7 @@ class Dataset(object):
 		}
 
 		columns_as_one_hot = {
-			k: np_utils.to_categorical( [text.one_hot(str(i[k]),n) for i in data] )
+			k: np_utils.to_categorical( np.unique([i[k] for i in data], return_inverse=True)[1] )
 			for (k,n) 
 			in keys_to_sizes.items()
 		}
@@ -100,6 +101,7 @@ class Dataset(object):
 
 
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
+	# This performs all transformations in-memory - it is not very efficient
 	@staticmethod
 	def generate(params):
 		with SimpleNodeClient() as client:
@@ -126,7 +128,8 @@ class Dataset(object):
 			data = list(data) # so we can do a few passes
 			hashing = Dataset.hash_statement_result(data, recipe.hashing)
 
-			print("Data", data[:10])
+			if params.verbose > 0:
+				print("Data sample: ", data[:10])
 
 			# Once I get my shit together,
 			# 1) use iterators

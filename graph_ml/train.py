@@ -10,15 +10,18 @@ class Train(object):
 	@staticmethod
 	def run(params):
 
+		np.random.seed(params.random_seed)
+
 		dataset = Dataset.generate(params)
 		model = Model.generate(params, dataset)
 
-		model.fit(np.array(dataset.train.x), np.array(dataset.train.y),
+		model.fit(dataset.train.x, dataset.train.y,
 			batch_size=params.batch_size,
 			epochs=params.epochs,
-			verbose=1,
-			validation_data=(np.array(dataset.validate.x), np.array(dataset.validate.y)))
+			verbose=params.verbose,
+			validation_split=0.1,
+			shuffle=True)
 
-		score = model.evaluate(np.array(dataset.test.x), np.array(dataset.test.y), verbose=0)
+		score = model.evaluate(dataset.test.x, dataset.test.y, verbose=0)
 
 		return score
