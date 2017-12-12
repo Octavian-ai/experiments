@@ -5,13 +5,36 @@ from uuid import UUID
 query = CypherQuery(
 """
 MATCH p=
-(a:PERSON {is_golden:false})-[:WROTE {is_golden:false}]->(b:REVIEW {is_golden:false})-[:OF {is_golden:false}]->(c:PRODUCT {is_golden:false})
-WITH a,b,c
-MATCH others=(other_person:PERSON)-[:WROTE {is_golden:false}]->(r:REVIEW {is_golden:false})-[:OF {is_golden:false}]->(c)
+    (a:PERSON {is_golden:false})
+        -[:WROTE {is_golden:false}]->
+    (b:REVIEW {is_golden:false})
+        -[:OF {is_golden:false}]->
+    (c:PRODUCT {is_golden:false})
+
+WITH 
+    a,b,c
+MATCH others=
+    (other_person:PERSON)
+        -[:WROTE {is_golden:false}]->
+    (r:REVIEW {is_golden:false})
+        -[:OF {is_golden:false}]->
+    (c)
 WHERE other_person<>a
-WITH a,b,c,COLLECT(others) as all_others
-WITH a,b,c,REDUCE(output = [], r IN all_others | output + relationships(r)) AS flat_relationships,REDUCE(output = [], r IN all_others | output + nodes(r)) AS flat_nodes
-RETURN a.style_preference, c.style, b.score,[r in  flat_relationships | [startNode(r).id, endNode(r).id]] as edges,  [n in  flat_nodes | properties(n)] as nodes
+
+WITH 
+    a,b,c,
+    COLLECT(others) as all_others
+
+WITH 
+    a,b,c,
+    REDUCE(output = [], r IN all_others | output + relationships(r)) AS flat_relationships,
+    REDUCE(output = [], r IN all_others | output + nodes(r)) AS flat_nodes
+RETURN 
+    a.style_preference, 
+    c.style, 
+    b.score,
+    [r in  flat_relationships | [startNode(r).id, endNode(r).id]] as edges,  
+    [n in  flat_nodes | properties(n)] as nodes
 LIMIT 100000
 """)
 
