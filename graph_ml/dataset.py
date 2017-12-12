@@ -11,6 +11,7 @@ from keras.utils import np_utils
 
 import neo4j
 
+import experiment
 from graph_io import *
 
 
@@ -28,6 +29,9 @@ class Point(object):
 	def __str__(self):
 		return "{x: " + str(self.x) + ",\ny: " + str(self.y) + "}"
 
+
+
+
 class Dataset(object):
 
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
@@ -35,48 +39,55 @@ class Dataset(object):
 	@staticmethod
 	def generate(params):
 		with SimpleNodeClient() as client:
-			
-			Recipe = collections.namedtuple('Recipe', ['query', 'params', 'hashing', 'split'])
 
+			Recipe = collections.namedtuple('Recipe', ['params', 'hashing', 'split'])
+
+			global_params = QueryParams(golden=params.golden, experiment=params.experiment)
+			
 			recipes = {
-				'simple': Recipe(
-						"""MATCH p=
-								(a:PERSON {is_golden:{golden}}) 
-									-[:WROTE {is_golden:{golden}}]-> 
-								(b:REVIEW {is_golden:{golden}}) 
-									-[:OF {is_golden:{golden}}]-> 
-								(c:PRODUCT {is_golden:{golden}})
-							RETURN a.style_preference AS preference, c.style AS style, b.score AS score
-							LIMIT 10000000
-						""",
-						QueryParams(golden=params.golden),
+				'review_from_visible_style': Recipe(
+						global_params,
 						{'preference':4, 'style':4},
 						lambda row, hashed: Point(np.concatenate((hashed['preference'], hashed['style'])), row['score'])
+					),
+
+				'review_from_hidden_style': Recipe(
+						global_params,
+						{'preference':4},
+						lambda row, hashed: Point((hashed['preference']), row['score'])
 					)
 			}
 
-			recipe = recipes[params.experiment]
-			data = client.execute_cypher(CypherQuery(recipe.query), recipe.params)
+			return Dataset.execute_recipe(params, recipes[params.experiment])
 
-			# Once I get my shit together,
-			# 1) use iterators
-			# 2) move to streaming
-			# 3) move to hdf5
 
-			data = list(data) # so we can do a few passes
 
-			if len(data) == 0:
-				raise Exception('Neo4j query returned no data, cannot train the network') 
 
-			if params.verbose > 0:
-				print("Retrieved {} rows from Neo4j".format(len(data)))
-				print("Data sample: ", data[:10])
 
-			hashing = Dataset.hash_statement_result(data, recipe.hashing)
 
-			xy = [recipe.split(*i) for i in zip(data, hashing)]
+	@staticmethod
+	def execute_recipe(params, recipe):
+		data = client.execute_cypher(CypherQuery(experiment.directory[params.experiment].cypher_query), recipe.params)
 
-			return Dataset(params, data, xy)
+		# Once I get my shit together,
+		# 1) use iterators
+		# 2) move to streaming
+		# 3) move to hdf5
+
+		data = list(data) # so we can do a few passes
+
+		if len(data) == 0:
+			raise Exception('Neo4j query returned no data, cannot train the network') 
+
+		if params.verbose > 0:
+			print("Retrieved {} rows from Neo4j".format(len(data)))
+			print("Data sample: ", data[:10])
+
+		hashing = Dataset.hash_statement_result(data, recipe.hashing)
+
+		xy = [recipe.split(*i) for i in zip(data, hashing)]
+
+		return Dataset(params, data, xy)
 
 	@staticmethod
 	def lazy_generate(params):

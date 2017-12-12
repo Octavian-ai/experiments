@@ -8,7 +8,7 @@ class Model(object):
 	@staticmethod
 	def generate(params, dataset):
 
-		if params.experiment == "simple":
+		if params.experiment == "review_from_visible_style":
 
 			model = Sequential([
 				Dense(8, 
