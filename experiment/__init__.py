@@ -77,7 +77,7 @@ directory = {
 				b.score AS score, 
 				others
 
-			LIMIT 1
+			LIMIT 10000
 		"""
 	)
 }

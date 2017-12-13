@@ -34,58 +34,29 @@ class Point(object):
 
 class Dataset(object):
 
+
+
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
 	# This performs all transformations in-memory - it is not very efficient
 	@staticmethod
 	def generate(params):
-		Recipe = collections.namedtuple('Recipe', ['params', 'hashing', 'split'])
+		Recipe = collections.namedtuple('Recipe', ['params', 'hashing', 'split', 'finalize_x'])
 
 		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
-
-		def review_from_hidden_style_row_transform(row, hashed):
-
-			bandit_hash = {
-				'A': [1.0, 0.0],
-				'B': [0.0, 1.0]
-			}
-			other_size = 100
-
-			others = []
-			for path in row["others"]:
-				other_person = path.nodes[0]
-				other_review = path.nodes[1]
-				others.append([bandit_hash[other_person.properties['style_preference']], other_review.properties['score']])
-
-			np.random.shuffle(others)
-
-			if len(others) > other_size:
-				others = others[:other_size]
-
-			others = np.pad(others, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
-
-			# pad out if too small
-			if len(others) < other_size:
-				delta = other_size - others.shape[0]
-				print(f"Extending by {delta}")
-				others = np.pad(others, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
-
-			return Point({
-				"person": bandit_hash[row["style_preference"]],
-				"neighbors": others
-			}, row["score"])
-			
 		
 		recipes = {
 			'review_from_visible_style': Recipe(
 					global_params,
 					{'style_preference':4, 'style':4},
-					lambda row, hashed: Point(np.concatenate((hashed['style_preference'], hashed['style'])), row['score'])
+					lambda row, hashed: Point(np.concatenate((hashed['style_preference'], hashed['style'])), row['score']),
+					lambda x: x
 				),
 
 			'review_from_hidden_style': Recipe(
 					global_params,
 					{'style_preference':4},
-					review_from_hidden_style_row_transform
+					Dataset.row_transform_review_from_hidden_style,
+					lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
 				)
 		}
 
@@ -111,7 +82,7 @@ class Dataset(object):
 			if len(data) == 0:
 				raise Exception('Neo4j query returned no data, cannot train the network') 
 
-			if params.verbose > 0:
+			if params.verbose > 1:
 				print("Retrieved {} rows from Neo4j".format(len(data)))
 				print("Data sample: ", data[:10])
 
@@ -119,7 +90,7 @@ class Dataset(object):
 
 			xy = [recipe.split(*i) for i in zip(data, hashing)]
 
-			return Dataset(params, data, xy)
+			return Dataset(params, recipe, data, xy)
 
 	@staticmethod
 	def lazy_generate(params):
@@ -136,7 +107,7 @@ class Dataset(object):
 		
 
 	# Split data into test/train set, organise it into a class
-	def __init__(self, params, data, xy):
+	def __init__(self, params, recipe, data, xy):
 		self.params = params
 		self.data = data
 		self.data_xy = xy
@@ -160,10 +131,10 @@ class Dataset(object):
 			store_datum(i)
 
 		# Yuck. fix later.
-		self.train.x = np.array(self.train.x)
+		self.train.x = recipe.finalize_x(np.array(self.train.x))
 		self.train.y = np.array(self.train.y)
 
-		self.test.x = np.array(self.test.x)
+		self.test.x = recipe.finalize_x(np.array(self.test.x))
 		self.test.y = np.array(self.test.y)
 		
 		if params.verbose > 0:
@@ -207,6 +178,39 @@ class Dataset(object):
 
 		return rows_keyed
 
+
+	@staticmethod
+	def row_transform_review_from_hidden_style(row, hashed):
+
+		bandit_hash = {
+			'A': np.array([1.0, 0.0]),
+			'B': np.array([0.0, 1.0])
+		}
+		other_size = 100
+
+		others = []
+		for path in row["others"]:
+			other_person = path.nodes[0]
+			other_review = path.nodes[1]
+			others.append(np.concatenate((
+				bandit_hash[other_person.properties['style_preference']], 
+				[other_review.properties['score']]
+			)))
+
+		np.random.shuffle(others)
+
+		if len(others) > other_size:
+			others = others[:other_size]
+
+		others = np.pad(others, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
+
+		# pad out if too small
+		# note if there are zero others, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
+		if len(others) < other_size:
+			delta = other_size - others.shape[0]
+			others = np.pad(others, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+
+		return Point({'person': bandit_hash[row["style_preference"]], 'neighbors':others}, row["score"])
 
 
 	

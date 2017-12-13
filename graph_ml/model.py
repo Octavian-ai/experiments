@@ -22,8 +22,8 @@ class Model(object):
 
 		elif params.experiment == "review_from_hidden_style":
 
-			neighbors = Input(shape=(100,3,), dtype='float32', name='neighbors')
-			person = Input(shape=(3,), dtype='float32', name='person')
+			neighbors = Input(shape=(100,4,), dtype='float32', name='neighbors')
+			person = Input(shape=(2,), dtype='float32', name='person')
 
 			m = Conv1D(4, 1, activation='softmax')(neighbors)
 			m = AveragePooling1D(100)(m)

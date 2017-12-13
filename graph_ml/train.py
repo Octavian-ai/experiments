@@ -57,7 +57,7 @@ class Train(object):
 
 		score = model.evaluate(dataset.test.x, dataset.test.y, verbose=0)
 
-		if score[1] < 1.0 and params.verbose > 0:
+		if score[1] < 1.0 and params.verbose > 1:
 			for layer in model.layers:
 				print("Layer weights", layer.get_weights())
 
