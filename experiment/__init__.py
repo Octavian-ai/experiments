@@ -1,7 +1,7 @@
 
 from collections import namedtuple
 
-Experiment = namedtuple('Experiment', ['doc', 'cyper_query'])
+Experiment = namedtuple('Experiment', ['doc', 'cypher_query'])
 
 directory = {
 	"review_from_visible_style": Experiment(
@@ -18,7 +18,7 @@ directory = {
 					(b:REVIEW {is_golden:{golden}}) 
 						-[:OF {is_golden:{golden}}]-> 
 					(c:PRODUCT {is_golden:{golden}})
-				RETURN a.style_preference AS preference, c.style AS style, b.score AS score
+				RETURN a.style_preference AS style_preference, c.style AS style, b.score AS score
 			"""
 		),
 
@@ -70,12 +70,14 @@ directory = {
 			WITH
 				a,
 				b,
-				COLLECT(others) as all_others
+				COLLECT(others) as others
 
 			RETURN 
-				a.style_preference AS preference, 
+				a.style_preference AS style_preference, 
 				b.score AS score, 
-				all_others
+				others
+
+			LIMIT 1
 		"""
 	)
 }
