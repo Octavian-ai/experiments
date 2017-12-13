@@ -2,6 +2,7 @@ from uuid import UUID, uuid4
 from .graph_node import NodeLabel, GraphNodeIdentifier, GraphNode, IsGoldenFlag
 from .nano_type import NanoType, NanoID
 from .style import Style
+from .dynamic_enum import DynamicEnum
 
 
 class ProductID(GraphNodeIdentifier):
@@ -11,24 +12,12 @@ class ProductID(GraphNodeIdentifier):
         super().__init__(self.LABEL, _id)
 
 
-class ProductStyleEnum(object):
-    def __init__(self, style: Style):
-        self.style = style
 
-    def __eq__(self, other):
-        return self.style == other.style
+class ProductStyleEnum(DynamicEnum[Style]):
 
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __str__(self):
-        return self.style.value
-
-    @classmethod
-    def parse(cls, name: str):
-        candidate = getattr(cls, name.upper())
-        assert isinstance(candidate, cls)
-        return candidate
+    @property
+    def style(self):
+        return self.defn
 
 
 class ProductStyle(NanoType[ProductStyleEnum]):

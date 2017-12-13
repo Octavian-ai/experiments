@@ -11,6 +11,7 @@ name = "pypi"
 tensorflow = "*"
 keras = "*"
 numpy = "*"
+lazy = "*"
 
 
 [dev-packages]

@@ -1,7 +1,6 @@
-
+from data_sets.synthetic_review_prediction.experiment_2 import run
 from graph_io import SimpleNodeClient
-from data_sets.synthetic_review_prediction.experiment_1 import run
+
 
 with SimpleNodeClient() as client:
-    client.nuke_db()
     run(client)

@@ -27,6 +27,9 @@ class NanoType(Generic[T]):
     def __lt__(self, other):
         return self._value.__lt__(other)
 
+    def __str__(self):
+        return str(self.value)
+
 
 class NanoID(NanoType[UUID]):
 
