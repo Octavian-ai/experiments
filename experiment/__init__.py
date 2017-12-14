@@ -23,7 +23,7 @@ directory = {
 		),
 
 
-	"review_from_hidden_style": Experiment(
+	"review_from_hidden_style_neighbor_conv": Experiment(
 		"""
 			A simple experiment requiring the ML system to aggregate information from a sub-graph
 
@@ -77,7 +77,6 @@ directory = {
 				b.score AS score, 
 				others
 
-			LIMIT 10000
 		"""
 	)
 }

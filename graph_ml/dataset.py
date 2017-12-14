@@ -3,15 +3,16 @@ import collections
 import random
 import pickle
 import os.path
+import hashlib
+import neo4j
 
 import keras
 import numpy as np
 from keras.preprocessing import text
 from keras.utils import np_utils
 
-import neo4j
-
 import experiment
+from .path import generate_output_path
 from graph_io import *
 
 
@@ -34,36 +35,41 @@ class Point(object):
 
 class Dataset(object):
 
+	@staticmethod
+	def get(params):
+		dataset_file = generate_output_path(params, '.pkl')
 
+		if os.path.isfile(dataset_file) and params.lazy:
+			return pickle.load(open(dataset_file, "rb"))
+
+		else:
+			d = Dataset.generate(params)
+			pickle.dump(d, open(dataset_file, "wb"))
+			return d
 
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
 	# This performs all transformations in-memory - it is not very efficient
 	@staticmethod
 	def generate(params):
-		Recipe = collections.namedtuple('Recipe', ['params', 'hashing', 'split', 'finalize_x'])
+		Recipe = collections.namedtuple('Recipe', ['params', 'split', 'finalize_x'])
 
 		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
 		
 		recipes = {
 			'review_from_visible_style': Recipe(
 					global_params,
-					{'style', 'style_preference'},
-					lambda row, hashed: Point(np.concatenate((hashed['style_preference'], hashed['style'])), row['score']),
+					lambda row, hashed: Point(np.concatenate((row['style_preference'], row['style'])), row['score']),
 					lambda x: x
 				),
 
-			'review_from_hidden_style': Recipe(
+			'review_from_hidden_style_neighbor_conv': Recipe(
 					global_params,
-					{'style_preference'},
 					Dataset.row_transform_review_from_hidden_style,
 					lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
 				)
 		}
 
 		return Dataset.execute_recipe(params, recipes[params.experiment])
-
-
-
 
 
 
@@ -86,24 +92,9 @@ class Dataset(object):
 				print("Retrieved {} rows from Neo4j".format(len(data)))
 				print("Data sample: ", data[:10])
 
-			hashing = Dataset.hash_statement_result(data, recipe.hashing)
-
-			xy = [recipe.split(*i) for i in zip(data, hashing)]
+			xy = [recipe.split(i) for i in data]
 
 			return Dataset(params, recipe, data, xy)
-
-	@staticmethod
-	def lazy_generate(params):
-
-		dataset_file = os.path.join(params.data_dir + '/' + params.experiment + '.pkl')
-
-		if os.path.isfile(dataset_file):
-			return pickle.load(open(dataset_file, "rb"))
-
-		else:
-			d = Dataset.generate(params)
-			pickle.dump(d, open(dataset_file, "wb"))
-			return d
 		
 
 	# Split data into test/train set, organise it into a class
@@ -139,30 +130,10 @@ class Dataset(object):
 		
 		if params.verbose > 0:
 			print("Test data sample: ", list(zip(self.test.x, self.test.y))[:10])
-		
-
-	# Transforms neo4j results into a hashed version with the same key structure
-	# Does not guarantee same hashing scheme used for each column, or for each run
-	# TODO: make this all more efficient
-	# @argument keys_to_sizes dictionary, the keys of which are the columns that will be hashed, the values of which are the size of each hash space
-	@staticmethod
-	def hash_statement_result(data:neo4j.v1.StatementResult, keys_to_use:set):
-
-		rows_keyed = [
-			{
-				key: np.array(x[key])
-				for key 
-				in keys_to_use
-			}
-			for x
-			in data
-		]
-
-		return rows_keyed
 
 
 	@staticmethod
-	def row_transform_review_from_hidden_style(row, hashed):
+	def row_transform_review_from_hidden_style(row):
 
 		other_size = 100
 
@@ -174,6 +145,8 @@ class Dataset(object):
 				np.array(other_person.properties['style_preference']),
 				[other_review.properties['score']]
 			)))
+
+		print("Neighbors", len(others))
 
 		np.random.shuffle(others)
 

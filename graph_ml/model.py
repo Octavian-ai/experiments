@@ -20,10 +20,10 @@ class Model(object):
 				optimizer=keras.optimizers.SGD(lr=0.3),
 				metrics=['accuracy'])
 
-		elif params.experiment == "review_from_hidden_style":
+		elif params.experiment == "review_from_hidden_style_neighbor_conv":
 
-			neighbors = Input(shape=(100,4,), dtype='float32', name='neighbors')
-			person = Input(shape=(2,), dtype='float32', name='person')
+			neighbors = Input(shape=(100,8,), dtype='float32', name='neighbors')
+			person = Input(shape=(6,), dtype='float32', name='person')
 
 			m = Conv1D(4, 1, activation='softmax')(neighbors)
 			m = AveragePooling1D(100)(m)
