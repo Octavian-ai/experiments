@@ -17,7 +17,7 @@ class NodeClient(object):
 
     def execute_cypher(self, cypher: CypherQuery, query_params: QueryParams):
         # TODO: If you use this for writes then bad things can happen
-        for x in self._session.run(cypher.value, query_params):
+        for x in self._session.run(cypher.value, **query_params.params):
             yield x
 
     def execute_cypher_write(self, cypher: CypherQuery, query_params: QueryParams):
@@ -35,12 +35,11 @@ class NodeClient(object):
 
     @staticmethod
     def close_client():
-        NodeClient.class_singleton.instance._session.__exit__()
         NodeClient.class_singleton._driver.close()
 
     @property
     def _nuke_db_query(self):
-        return CypherQuery("MATCH (n) DELETE DETACH n")
+        return CypherQuery("MATCH (n) DETACH DELETE n")
 
     def nuke_db(self):
         self.instance.execute_cypher(self._nuke_db_query, QueryParams())
@@ -56,6 +55,7 @@ class SimpleNodeClient(NodeClient):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        self.instance._session.__exit__(None, None, None)
         NodeClient.close_client()
         self.instance = None
         return
