@@ -22,14 +22,16 @@ class Model(object):
 
 		elif params.experiment == "review_from_hidden_style_neighbor_conv":
 
-			neighbors = Input(shape=(100,8,), dtype='float32', name='neighbors')
-			person = Input(shape=(6,), dtype='float32', name='person')
+			n_styles = 6
 
-			m = Conv1D(4, 1, activation='softmax')(neighbors)
+			neighbors = Input(shape=(100,n_styles+2,), dtype='float32', name='neighbors')
+			person = Input(shape=(n_styles,), dtype='float32', name='person')
+
+			m = Conv1D(n_styles*2, 1, activation='softmax')(neighbors)
 			m = AveragePooling1D(100)(m)
-			m = Reshape([4])(m)
+			m = Reshape([n_styles*2])(m)
 			m = Concatenate()([m, person])
-			m = Dense(8, activation='softmax')(m)
+			m = Dense(n_styles*n_styles, activation='softmax')(m)
 			m = Dense(1, activation='sigmoid')(m)
 			score = m
 
