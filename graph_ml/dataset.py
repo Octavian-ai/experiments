@@ -58,7 +58,7 @@ class Dataset(object):
 		recipes = {
 			'review_from_visible_style': Recipe(
 					global_params,
-					lambda row, hashed: Point(np.concatenate((row['style_preference'], row['style'])), row['score']),
+					lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score']),
 					lambda x: x
 				),
 

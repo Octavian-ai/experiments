@@ -1,5 +1,6 @@
 
 import os.path
+from datetime import datetime
 
 import keras
 import numpy as np
@@ -42,6 +43,7 @@ class Train(object):
 		if params.random_seed is not None:
 			np.random.seed(params.random_seed)
 
+		run_tag = str(datetime.now())
 		dataset = Dataset.get(params)
 		model = Model.generate(params, dataset)
 		params_file = generate_output_path(params, ".hdf5")
@@ -52,7 +54,7 @@ class Train(object):
 		callbacks = [
 			StopEarlyIfAbove(verbose=params.verbose),
 			keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose),
-			keras.callbacks.TensorBoard(log_dir=generate_output_path(params, "_log/"))
+			keras.callbacks.TensorBoard(log_dir=generate_output_path(params, f"_log/{run_tag}/"))
 		]
 		
 		model.fit(dataset.train.x, dataset.train.y,
