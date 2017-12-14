@@ -47,14 +47,14 @@ class Dataset(object):
 		recipes = {
 			'review_from_visible_style': Recipe(
 					global_params,
-					{'style_preference':4, 'style':4},
+					{'style', 'style_preference'},
 					lambda row, hashed: Point(np.concatenate((hashed['style_preference'], hashed['style'])), row['score']),
 					lambda x: x
 				),
 
 			'review_from_hidden_style': Recipe(
 					global_params,
-					{'style_preference':4},
+					{'style_preference'},
 					Dataset.row_transform_review_from_hidden_style,
 					lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
 				)
@@ -146,34 +146,16 @@ class Dataset(object):
 	# TODO: make this all more efficient
 	# @argument keys_to_sizes dictionary, the keys of which are the columns that will be hashed, the values of which are the size of each hash space
 	@staticmethod
-	def hash_statement_result(data:neo4j.v1.StatementResult, keys_to_sizes:dict):
-
-		a = {
-			k: [str(i[k])for i in data]
-			for (k,n) 
-			in keys_to_sizes.items()
-		}
-
-		b = {
-			k: [text.one_hot(str(i[k]),n) for i in data]
-			for (k,n) 
-			in keys_to_sizes.items()
-		}
-
-		columns_as_one_hot = {
-			k: np_utils.to_categorical( np.unique([i[k] for i in data], return_inverse=True)[1] )
-			for (k,n) 
-			in keys_to_sizes.items()
-		}
+	def hash_statement_result(data:neo4j.v1.StatementResult, keys_to_use:set):
 
 		rows_keyed = [
 			{
-				key: columns_as_one_hot[key][i]
+				key: np.array(x[key])
 				for key 
-				in keys_to_sizes.keys()
+				in keys_to_use
 			}
-
-			for i in range(len(data))
+			for x
+			in data
 		]
 
 		return rows_keyed
@@ -182,10 +164,6 @@ class Dataset(object):
 	@staticmethod
 	def row_transform_review_from_hidden_style(row, hashed):
 
-		bandit_hash = {
-			'A': np.array([1.0, 0.0]),
-			'B': np.array([0.0, 1.0])
-		}
 		other_size = 100
 
 		others = []
@@ -193,7 +171,7 @@ class Dataset(object):
 			other_person = path.nodes[0]
 			other_review = path.nodes[1]
 			others.append(np.concatenate((
-				bandit_hash[other_person.properties['style_preference']], 
+				np.array(other_person.properties['style_preference']),
 				[other_review.properties['score']]
 			)))
 
@@ -210,7 +188,7 @@ class Dataset(object):
 			delta = other_size - others.shape[0]
 			others = np.pad(others, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
 
-		return Point({'person': bandit_hash[row["style_preference"]], 'neighbors':others}, row["score"])
+		return Point({'person': np.array(row["style_preference"]), 'neighbors':others}, row["score"])
 
 
 	
