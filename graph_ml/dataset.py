@@ -40,9 +40,13 @@ class Dataset(object):
 		dataset_file = generate_output_path(params, '.pkl')
 
 		if os.path.isfile(dataset_file) and params.lazy:
+			if params.verbose > 0:
+				print("Opening data pickle")
 			d = pickle.load(open(dataset_file, "rb"))
 
 		else:
+			if params.verbose > 0:
+				print("Querying data from database")
 			d = Dataset.generate(params)
 			pickle.dump(d, open(dataset_file, "wb"))
 

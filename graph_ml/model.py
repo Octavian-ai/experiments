@@ -3,6 +3,33 @@ import keras
 from keras.models import Sequential, Model
 from keras.layers import *
 
+# Rainbow sprinkles for your activation function
+# @argument m: (?,N) tensor
+# @returns (?,N*5) tensor
+def PolyActivation(m):
+	# wildcard of the day - let's do inception style activation because I've no idea which is best
+	# and frequently I get great boosts from switching activation functions
+	activations = ['tanh', 'sigmoid', 'softmax', 'softplus', 'relu']
+	return Concatenate()([
+		Activation(i)(m) for i in activations
+	])
+
+
+# Use as activation function
+# @returns Same sized tensor as input
+def PolySwitchActivation(m):
+	# will fail for shared nodes
+	print(m.shape)
+
+	if len(m.shape) != 3:
+		# TODO: make this work in a sane way
+		m = Reshape([i for i in m.shape.dims if i is not None] + [1])(m) # warning: assumes tensorflow
+
+	activations = ['tanh', 'sigmoid', 'softmax', 'softplus', 'relu']
+	return add([
+		Conv1D(1,1)(Activation(i)(m)) for i in activations
+	])
+
 class Model(object):
 
 	@classmethod
@@ -29,7 +56,8 @@ class Model(object):
 
 			m = cls.style_from_neighbors(neighbors, n_styles)
 			m = Concatenate()([m, person])
-			m = Dense(n_styles*n_styles, activation='softmax')(m)
+			m = Dense(n_styles*4)(m)
+			m = PolyActivation(m)
 			m = Dense(1, activation='sigmoid')(m)
 
 			model = keras.models.Model(inputs=[person, neighbors], outputs=[m])

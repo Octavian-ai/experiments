@@ -44,7 +44,13 @@ class Train(object):
 			np.random.seed(params.random_seed)
 
 		run_tag = str(datetime.now())
+
+		if params.verbose > 0:
+			print("Get data")
 		dataset = Dataset.get(params)
+
+		if params.verbose > 0:
+			print("Generate model")
 		model = Model.generate(params, dataset)
 		params_file = generate_output_path(params, ".hdf5")
 
@@ -57,6 +63,8 @@ class Train(object):
 			keras.callbacks.TensorBoard(log_dir=generate_output_path(params, f"_log/{run_tag}/"))
 		]
 		
+		if params.verbose > 0:
+			print("Begin training")
 		model.fit(dataset.train.x, dataset.train.y,
 			batch_size=params.batch_size,
 			epochs=params.epochs,
