@@ -48,7 +48,7 @@ class Train(object):
 		model = Model.generate(params, dataset)
 		params_file = generate_output_path(params, ".hdf5")
 
-		if os.path.isfile(params_file) and params.lazy:
+		if os.path.isfile(params_file) and params.load_weights:
 			model.load_weights(params_file)
 
 		callbacks = [

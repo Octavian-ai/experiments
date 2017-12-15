@@ -70,15 +70,45 @@ directory = {
 			WITH
 				a,
 				b,
-				COLLECT(others) as others
+				COLLECT(others) as neighbors
 
 			RETURN 
 				a.style_preference AS style_preference, 
 				b.score AS score, 
-				others
+				neighbors
 
 		"""
-	)
+		),
+	"style_from_neighbor_conv": Experiment(
+		""" 
+		A precursor to review_from_hidden_style_neighbor_conv
+
+		This experiment seeks to see if we can efficiently determine a product's style
+		given it's set of reviews and the style_preference of each reviewer.
+
+		This should be easy!!
+
+		""",
+		"""
+			MATCH p=
+				(a:PERSON {is_golden:{golden}}) 
+					-[:WROTE {is_golden:{golden}}]-> 
+				(b:REVIEW {is_golden:{golden}}) 
+					-[:OF {is_golden:{golden}}]-> 
+				(product:PRODUCT {is_golden:{golden}})
+
+			WITH
+				product,
+				COLLECT(p) as neighbors
+
+			RETURN 
+				product.style,
+				neighbors
+
+		"""
+
+		)
+
 }
 
 default = "review_from_visible_style"

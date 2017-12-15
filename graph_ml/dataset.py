@@ -40,41 +40,50 @@ class Dataset(object):
 		dataset_file = generate_output_path(params, '.pkl')
 
 		if os.path.isfile(dataset_file) and params.lazy:
-			return pickle.load(open(dataset_file, "rb"))
+			d = pickle.load(open(dataset_file, "rb"))
 
 		else:
 			d = Dataset.generate(params)
 			pickle.dump(d, open(dataset_file, "wb"))
-			return d
+
+		if params.verbose > 0:
+			print("Test data sample: ", list(zip(d.test.x, d.test.y))[:10])
+
+		return d
 
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
 	# This performs all transformations in-memory - it is not very efficient
-	@staticmethod
-	def generate(params):
-		Recipe = collections.namedtuple('Recipe', ['params', 'split', 'finalize_x'])
+	@classmethod
+	def generate(cls, params):
 
 		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
-		
+
+		class Recipe:
+			def __init__(self, split, finalize_x=lambda x:x, params=global_params):
+				self.split = split
+				self.finalize_x = finalize_x
+				self.params = params
+				
+
 		recipes = {
 			'review_from_visible_style': Recipe(
-					global_params,
-					lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score']),
-					lambda x: x
-				),
-
+				lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
+			),
 			'review_from_hidden_style_neighbor_conv': Recipe(
-					global_params,
-					Dataset.row_transform_review_from_hidden_style,
-					lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
-				)
+				DatasetHelpers.review_from_hidden_style_neighbor_conv,
+				lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
+			),
+			'style_from_neighbor_conv': Recipe(
+				DatasetHelpers.style_from_neighbor_conv
+			)
 		}
 
 		return Dataset.execute_recipe(params, recipes[params.experiment])
 
 
 
-	@staticmethod
-	def execute_recipe(params, recipe):
+	@classmethod
+	def execute_recipe(cls, params, recipe):
 		with SimpleNodeClient() as client:
 			data = client.execute_cypher(CypherQuery(experiment.directory[params.experiment].cypher_query), recipe.params)
 
@@ -127,41 +136,47 @@ class Dataset(object):
 
 		self.test.x = recipe.finalize_x(np.array(self.test.x))
 		self.test.y = np.array(self.test.y)
-		
-		if params.verbose > 0:
-			print("Test data sample: ", list(zip(self.test.x, self.test.y))[:10])
 
 
-	@staticmethod
-	def row_transform_review_from_hidden_style(row):
 
-		other_size = 100
+class DatasetHelpers(object):
 
-		others = []
-		for path in row["others"]:
+	@classmethod
+	def collect_neighbors(cls, row, key, length=100):
+		subrows = []
+		for path in row[key]:
 			other_person = path.nodes[0]
 			other_review = path.nodes[1]
-			others.append(np.concatenate((
+			subrows.append(np.concatenate((
 				np.array(other_person.properties['style_preference']),
 				[other_review.properties['score']]
 			)))
 
-		print("Neighbors", len(others))
+		np.random.shuffle(subrows)
 
-		np.random.shuffle(others)
+		if len(subrows) > length:
+			subrows = subrows[:length]
 
-		if len(others) > other_size:
-			others = others[:other_size]
-
-		others = np.pad(others, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
+		subrows = np.pad(subrows, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
 
 		# pad out if too small
-		# note if there are zero others, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
-		if len(others) < other_size:
-			delta = other_size - others.shape[0]
-			others = np.pad(others, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+		# note if there are zero subrows, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
+		if len(subrows) < length:
+			delta = length - subrows.shape[0]
+			subrows = np.pad(subrows, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
 
-		return Point({'person': np.array(row["style_preference"]), 'neighbors':others}, row["score"])
+		return subrows
+
+
+	@classmethod
+	def review_from_hidden_style_neighbor_conv(cls, row):
+		neighbors = cls.collect_neighbors(row, 'neighbors')
+		return Point({'person': np.array(row["style_preference"]), 'neighbors':neighbors}, row["score"])
+
+	@classmethod
+	def style_from_neighbor_conv(cls, row):
+		neighbors = cls.collect_neighbors(row, 'neighbors')
+		return Point(neighbors, row["product.style"])		
 
 
 	

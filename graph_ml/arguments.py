@@ -17,6 +17,7 @@ class Arguments(object):
 
 		parser.add_argument('--golden', action='store_true')
 		parser.add_argument('--lazy', action='store_true')
+		parser.add_argument('--load-weights', action='store_true')
 
 
 		parser.add_argument('--output-dir', type=str, default="./output")
