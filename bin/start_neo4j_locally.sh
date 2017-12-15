@@ -1,3 +1,7 @@
-rm -rf data/*
-mvn -DskipTests clean package
-docker run -v /Users/andrew/neo4j/repos/neo4j-cloud/tmpconf:/conf --publish=7474:7474 --publish=7687:7687 --volume=$(pwd)/data:/data --volume=$(pwd)/out:/plugins  -e NEO4J_dbms_security_procedures_unrestricted=*.\\\* neo4j:3.2.5
+#!/usr/bin/env bash
+
+CONTAINER_ID=$(docker run -d --publish=7474:7474 --publish=7687:7687 --volume=$(pwd)/data/neo4j:/data  neo4j:3.2.7)
+sleep 10
+docker run -it --net host neo4j:3.2.7 bin/cypher-shell -u neo4j -p neo4j "CALL dbms.changePassword('local neo hates security!')"
+
+echo "Neo4j running locally. To stop it: docker kill ${CONTAINER_ID}"
