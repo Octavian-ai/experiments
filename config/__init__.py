@@ -39,4 +39,6 @@ config: Config = Config()
 
 import os
 
+if 'ENVIRONMENT' not in os.environ:
+    raise Exception("You must set an ENVIRONMENT variable. Sorry, I am very opinionated that we should not have a default value because it will mask misconfiguration issues later.")
 set_environment(os.environ['ENVIRONMENT'])

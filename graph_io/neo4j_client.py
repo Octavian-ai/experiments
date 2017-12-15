@@ -1,5 +1,5 @@
 from neo4j.v1 import GraphDatabase, Driver
-from .classes import CypherQuery, QueryParams
+from .classes import CypherQuery, QueryParams, DatasetName
 from config import config
 from lazy import lazy
 
@@ -17,11 +17,11 @@ class NodeClient(object):
 
     def execute_cypher(self, cypher: CypherQuery, query_params: QueryParams):
         # TODO: If you use this for writes then bad things can happen
-        for x in self._session.run(cypher.value, **query_params.params):
+        for x in self._session.run(cypher.value, **query_params.cypher_query_parameters):
             yield x
 
     def execute_cypher_write(self, cypher: CypherQuery, query_params: QueryParams):
-        execute_cypher = lambda tx: tx.run(cypher.value, **query_params.params)
+        execute_cypher = lambda tx: tx.run(cypher.value, **query_params.cypher_query_parameters)
 
         session = self._session
         result = session.write_transaction(execute_cypher)
@@ -62,4 +62,3 @@ class SimpleNodeClient(NodeClient):
 
     def __getattr__(self, item):
         return getattr(self.instance, item)
-

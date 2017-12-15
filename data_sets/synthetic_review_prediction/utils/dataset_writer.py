@@ -1,0 +1,60 @@
+from graph_io import SimpleNodeClient, CypherQuery, QueryParams
+from ..classes import GraphNode, GraphEdge, IsGoldenFlag
+from graph_io.classes.dataset_name import DatasetName
+from typing import Set, AnyStr
+from uuid import UUID
+
+
+class DatasetWriter(object):
+    ADDITIONAL_NODE_PROPERTIES: Set[AnyStr] = {'id'}
+
+    def __init__(self, client: SimpleNodeClient, dataset_name: DatasetName):
+        self.dataset_name = dataset_name
+        self._client = client
+
+    def __enter__(self):
+        # TODO: do query batching with a buffer etc. to increase performance
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # TODO: on non error exits wait until the buffer has all flushed
+        pass
+
+    def nuke_dataset(self):
+        query = CypherQuery("MATCH (n:NODE {dataset_name: $dataset_name}) DETACH DELETE n")
+        self._client.execute_cypher_write(query, QueryParams(dataset_name=self.dataset_name))
+
+    def create_node_if_not_exists(self, node: GraphNode, properties: Set[AnyStr]): # TODO: define properties on the node entity itself?
+        properties = properties.union(self.ADDITIONAL_NODE_PROPERTIES)
+
+        query_params = self._get_properties_for_query(node, properties)
+
+        create_query = CypherQuery(f"MERGE (n:{node.label_string} {query_params.query_string} )")
+
+        result = self._client.execute_cypher_write(create_query, query_params)
+        # TODO: check that result wasn't an error
+
+        print("merged node", query_params._params, result)
+
+    def create_edge_if_not_exists(self, edge: GraphEdge, properties: Set[AnyStr]):
+        _from = edge._from
+        _to = edge._to
+
+        query_params = self._get_properties_for_query(edge, properties)
+
+        match = f"MATCH (from:{_from.label_string} {{ id: $from_id }}), (to:{_to.label_string} {{ id: $to_id }})"
+        merge = f"MERGE (from)-[r:{edge.relationship} {query_params.query_string} ]->(to)"
+
+        create_query = CypherQuery(match + "\n" + merge)
+        query_params = query_params.union(QueryParams(from_id=str(_from.id.value), to_id=str(_to.id.value)))
+
+        result = self._client.execute_cypher_write(create_query, query_params)
+        print("merged edge", query_params._params, result)
+
+    def _get_properties_for_query(self, node, properties):
+        properties.add('is_golden')
+        print(properties)
+        properties_dict = {name: getattr(node, name) for name in properties}
+
+        query_params = QueryParams(dataset_name=self.dataset_name, **properties_dict)
+        return query_params
