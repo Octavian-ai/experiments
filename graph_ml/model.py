@@ -68,12 +68,33 @@ class Model(object):
 
 		elif params.experiment == "style_from_neighbor_conv":
 
+			# TODO: Move this into Experiment header
 			n_styles = 6
+			n_sequence = 100
 
-			neighbors = Input(shape=(100,n_styles+2,), dtype='float32', name='neighbors')
-			m = cls.style_from_neighbors(neighbors, n_styles)
+			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
+			m = cls.style_from_neighbors(neighbors, n_styles, n_sequence)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
+
+			model.compile(loss='categorical_crossentropy',
+				optimizer=keras.optimizers.SGD(lr=0.3),
+				metrics=['accuracy'])
+
+		elif params.experiment == "style_from_neighbor_rnn":
+
+			# TODO: Move this into Experiment header
+			n_styles = 6
+			n_sequence = 100
+
+			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
+			m = LSTM(n_sequence)(neighbors)
+			m = Dense(n_styles)(m)
+			m = Activation('sigmoid', name='final_activation')(m)
+
+			model = keras.models.Model(inputs=[neighbors], outputs=[m])
+
+			print("Layers", model.layers)
 
 			model.compile(loss='categorical_crossentropy',
 				optimizer=keras.optimizers.SGD(lr=0.3),
@@ -82,9 +103,9 @@ class Model(object):
 		return model
 
 	@classmethod 
-	def style_from_neighbors(cls, neighbors, n_styles):
+	def style_from_neighbors(cls, neighbors, n_styles, n_sequence):
 		m = Conv1D(n_styles, 1, activation='tanh')(neighbors)
-		m = MaxPooling1D(100)(m)
+		m = MaxPooling1D(n_sequence)(m)
 		m = Reshape([n_styles])(m)
 		m = Dense(n_styles)(m)
 		m = Activation('softmax')(m)

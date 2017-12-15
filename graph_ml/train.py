@@ -38,21 +38,18 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 class Train(object):
 
 	@staticmethod
-	def run(params):
+	def run(experiment, dataset):
+
+		params = experiment.params
 
 		if params.random_seed is not None:
 			np.random.seed(params.random_seed)
 
-		run_tag = str(datetime.now())
-
-		if params.verbose > 0:
-			print("Get data")
-		dataset = Dataset.get(params)
-
 		if params.verbose > 0:
 			print("Generate model")
+
 		model = Model.generate(params, dataset)
-		params_file = generate_output_path(params, ".hdf5")
+		params_file = generate_output_path(experiment, ".hdf5")
 
 		if os.path.isfile(params_file) and params.load_weights:
 			model.load_weights(params_file)
@@ -60,11 +57,12 @@ class Train(object):
 		callbacks = [
 			StopEarlyIfAbove(verbose=params.verbose),
 			keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose),
-			keras.callbacks.TensorBoard(log_dir=generate_output_path(params, f"_log/{run_tag}/"))
+			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/"))
 		]
 		
 		if params.verbose > 0:
 			print("Begin training")
+
 		model.fit(dataset.train.x, dataset.train.y,
 			batch_size=params.batch_size,
 			epochs=params.epochs,

@@ -5,6 +5,7 @@ import pickle
 import os.path
 import hashlib
 import neo4j
+from typing import Callable
 
 import keras
 import numpy as np
@@ -36,8 +37,10 @@ class Point(object):
 class Dataset(object):
 
 	@staticmethod
-	def get(params):
-		dataset_file = generate_output_path(params, '.pkl')
+	def get(experiment):
+		params = experiment.params
+		
+		dataset_file = generate_output_path(experiment, '.pkl')
 
 		if os.path.isfile(dataset_file) and params.lazy:
 			if params.verbose > 0:
@@ -63,7 +66,7 @@ class Dataset(object):
 		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
 
 		class Recipe:
-			def __init__(self, split, finalize_x=lambda x:x, params=global_params):
+			def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x, params:QueryParams=global_params):
 				self.split = split
 				self.finalize_x = finalize_x
 				self.params = params
@@ -78,7 +81,10 @@ class Dataset(object):
 				lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
 			),
 			'style_from_neighbor_conv': Recipe(
-				DatasetHelpers.style_from_neighbor_conv
+				DatasetHelpers.style_from_neighbor(100)
+			),
+			'style_from_neighbor_rnn': Recipe(
+				DatasetHelpers.style_from_neighbor(100)
 			)
 		}
 
@@ -145,8 +151,10 @@ class Dataset(object):
 
 class DatasetHelpers(object):
 
+	# Turn neighbors sub-graph into a sampled array of neighbours
+	# @argument length What size of array should be returned. Use None for variable. If you request a fixed length, the first column of the feature is a 0.0/1.0 flag of where there is data or zeros in that feature row
 	@classmethod
-	def collect_neighbors(cls, row, key, length=100):
+	def collect_neighbors(cls, row, key, length:int=100):
 		subrows = []
 		for path in row[key]:
 			other_person = path.nodes[0]
@@ -156,18 +164,21 @@ class DatasetHelpers(object):
 				[other_review.properties['score']]
 			)))
 
+		# Lets always shuffle to keep the network on its toes
+		# If you use --random-seed you'll fix this to be the same each run
 		np.random.shuffle(subrows)
 
-		if len(subrows) > length:
-			subrows = subrows[:length]
+		if length is not None:
+			if len(subrows) > length:
+				subrows = subrows[:length]
+	
+			subrows = np.pad(subrows, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
 
-		subrows = np.pad(subrows, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
-
-		# pad out if too small
-		# note if there are zero subrows, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
-		if len(subrows) < length:
-			delta = length - subrows.shape[0]
-			subrows = np.pad(subrows, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+			# pad out if too small
+			# note if there are zero subrows, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
+			if len(subrows) < length:
+				delta = length - subrows.shape[0]
+				subrows = np.pad(subrows, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
 
 		return subrows
 
@@ -178,9 +189,16 @@ class DatasetHelpers(object):
 		return Point({'person': np.array(row["style_preference"]), 'neighbors':neighbors}, row["score"])
 
 	@classmethod
-	def style_from_neighbor_conv(cls, row):
-		neighbors = cls.collect_neighbors(row, 'neighbors')
-		return Point(neighbors, row["product.style"])		
+	def style_from_neighbor(cls, length):
+		# Python you suck at developer productivity.
+		# Seriously, coffeescript has all these things sorted out
+		# Like no anonymous functions? Fuck you.
+		def transform_row(row):
+			neighbors = cls.collect_neighbors(row, 'neighbors', length)
+			return Point(neighbors, row["product"].properties["style"])
+		return transform_row
+
+
 
 
 	

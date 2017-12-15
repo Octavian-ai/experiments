@@ -1,14 +1,14 @@
 
 import argparse
 
-import experiment
+from .directory import directory, default_experiment
 
 class Arguments(object):
 	def parse():
 
 		parser = argparse.ArgumentParser()
 
-		parser.add_argument('--experiment', type=str, default=experiment.default, choices=experiment.directory.keys())
+		parser.add_argument('--experiment', type=str, default=default_experiment, choices=directory.keys())
 
 		parser.add_argument('--batch_size', type=int, default=16)
 		parser.add_argument('--epochs', type=int, default=100)
