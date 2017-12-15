@@ -12,6 +12,7 @@ tensorflow = "*"
 keras = "*"
 numpy = "*"
 lazy = "*"
+"h5py" = "*"
 
 
 [dev-packages]

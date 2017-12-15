@@ -1,3 +1,5 @@
+Join our Discord >> https://discord.gg/a2Z82Te
+
 # Review prediction
 
 ## Introduction

@@ -3,15 +3,17 @@ import collections
 import random
 import pickle
 import os.path
+import hashlib
+import neo4j
+from typing import Callable
 
 import keras
 import numpy as np
 from keras.preprocessing import text
 from keras.utils import np_utils
 
-import neo4j
-
 import experiment
+from .path import generate_output_path
 from graph_io import *
 
 
@@ -34,41 +36,64 @@ class Point(object):
 
 class Dataset(object):
 
+	@staticmethod
+	def get(experiment):
+		params = experiment.params
+		
+		dataset_file = generate_output_path(experiment, '.pkl')
 
+		if os.path.isfile(dataset_file) and params.lazy:
+			if params.verbose > 0:
+				print("Opening data pickle")
+			d = pickle.load(open(dataset_file, "rb"))
+
+		else:
+			if params.verbose > 0:
+				print("Querying data from database")
+			d = Dataset.generate(params)
+			pickle.dump(d, open(dataset_file, "wb"))
+
+		if params.verbose > 0:
+			print("Test data sample: ", list(zip(d.test.x, d.test.y))[:10])
+
+		return d
 
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
 	# This performs all transformations in-memory - it is not very efficient
-	@staticmethod
-	def generate(params):
-		Recipe = collections.namedtuple('Recipe', ['params', 'hashing', 'split', 'finalize_x'])
+	@classmethod
+	def generate(cls, params):
 
 		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
-		
+
+		class Recipe:
+			def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x, params:QueryParams=global_params):
+				self.split = split
+				self.finalize_x = finalize_x
+				self.params = params
+				
+
 		recipes = {
 			'review_from_visible_style': Recipe(
-					global_params,
-					{'style', 'style_preference'},
-					lambda row, hashed: Point(np.concatenate((hashed['style_preference'], hashed['style'])), row['score']),
-					lambda x: x
-				),
-
-			'review_from_hidden_style': Recipe(
-					global_params,
-					{'style_preference'},
-					Dataset.row_transform_review_from_hidden_style,
-					lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
-				)
+				lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
+			),
+			'review_from_hidden_style_neighbor_conv': Recipe(
+				DatasetHelpers.review_from_hidden_style_neighbor_conv,
+				lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
+			),
+			'style_from_neighbor_conv': Recipe(
+				DatasetHelpers.style_from_neighbor(100)
+			),
+			'style_from_neighbor_rnn': Recipe(
+				DatasetHelpers.style_from_neighbor(100)
+			)
 		}
 
 		return Dataset.execute_recipe(params, recipes[params.experiment])
 
 
 
-
-
-
-	@staticmethod
-	def execute_recipe(params, recipe):
+	@classmethod
+	def execute_recipe(cls, params, recipe):
 		with SimpleNodeClient() as client:
 			data = client.execute_cypher(CypherQuery(experiment.directory[params.experiment].cypher_query), recipe.params)
 
@@ -86,24 +111,9 @@ class Dataset(object):
 				print("Retrieved {} rows from Neo4j".format(len(data)))
 				print("Data sample: ", data[:10])
 
-			hashing = Dataset.hash_statement_result(data, recipe.hashing)
-
-			xy = [recipe.split(*i) for i in zip(data, hashing)]
+			xy = [recipe.split(i) for i in data]
 
 			return Dataset(params, recipe, data, xy)
-
-	@staticmethod
-	def lazy_generate(params):
-
-		dataset_file = os.path.join(params.data_dir + '/' + params.experiment + '.pkl')
-
-		if os.path.isfile(dataset_file):
-			return pickle.load(open(dataset_file, "rb"))
-
-		else:
-			d = Dataset.generate(params)
-			pickle.dump(d, open(dataset_file, "wb"))
-			return d
 		
 
 	# Split data into test/train set, organise it into a class
@@ -136,59 +146,59 @@ class Dataset(object):
 
 		self.test.x = recipe.finalize_x(np.array(self.test.x))
 		self.test.y = np.array(self.test.y)
-		
-		if params.verbose > 0:
-			print("Test data sample: ", list(zip(self.test.x, self.test.y))[:10])
-		
-
-	# Transforms neo4j results into a hashed version with the same key structure
-	# Does not guarantee same hashing scheme used for each column, or for each run
-	# TODO: make this all more efficient
-	# @argument keys_to_sizes dictionary, the keys of which are the columns that will be hashed, the values of which are the size of each hash space
-	@staticmethod
-	def hash_statement_result(data:neo4j.v1.StatementResult, keys_to_use:set):
-
-		rows_keyed = [
-			{
-				key: np.array(x[key])
-				for key 
-				in keys_to_use
-			}
-			for x
-			in data
-		]
-
-		return rows_keyed
 
 
-	@staticmethod
-	def row_transform_review_from_hidden_style(row, hashed):
 
-		other_size = 100
+class DatasetHelpers(object):
 
-		others = []
-		for path in row["others"]:
+	# Turn neighbors sub-graph into a sampled array of neighbours
+	# @argument length What size of array should be returned. Use None for variable. If you request a fixed length, the first column of the feature is a 0.0/1.0 flag of where there is data or zeros in that feature row
+	@classmethod
+	def collect_neighbors(cls, row, key, length:int=100):
+		subrows = []
+		for path in row[key]:
 			other_person = path.nodes[0]
 			other_review = path.nodes[1]
-			others.append(np.concatenate((
+			subrows.append(np.concatenate((
 				np.array(other_person.properties['style_preference']),
 				[other_review.properties['score']]
 			)))
 
-		np.random.shuffle(others)
+		# Lets always shuffle to keep the network on its toes
+		# If you use --random-seed you'll fix this to be the same each run
+		np.random.shuffle(subrows)
 
-		if len(others) > other_size:
-			others = others[:other_size]
+		if length is not None:
+			if len(subrows) > length:
+				subrows = subrows[:length]
+	
+			subrows = np.pad(subrows, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
 
-		others = np.pad(others, ((0,0), (1,0)), 'constant', constant_values=1.0) # add 'none' flag
+			# pad out if too small
+			# note if there are zero subrows, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
+			if len(subrows) < length:
+				delta = length - subrows.shape[0]
+				subrows = np.pad(subrows, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
 
-		# pad out if too small
-		# note if there are zero others, this won't know the width to make the zeros, so it'll be 1 wide and broadcast later
-		if len(others) < other_size:
-			delta = other_size - others.shape[0]
-			others = np.pad(others, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+		return subrows
 
-		return Point({'person': np.array(row["style_preference"]), 'neighbors':others}, row["score"])
+
+	@classmethod
+	def review_from_hidden_style_neighbor_conv(cls, row):
+		neighbors = cls.collect_neighbors(row, 'neighbors')
+		return Point({'person': np.array(row["style_preference"]), 'neighbors':neighbors}, row["score"])
+
+	@classmethod
+	def style_from_neighbor(cls, length):
+		# Python you suck at developer productivity.
+		# Seriously, coffeescript has all these things sorted out
+		# Like no anonymous functions? Fuck you.
+		def transform_row(row):
+			neighbors = cls.collect_neighbors(row, 'neighbors', length)
+			return Point(neighbors, row["product"].properties["style"])
+		return transform_row
+
+
 
 
 	

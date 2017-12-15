@@ -1,10 +1,7 @@
 
-from graph_ml import Arguments, Train
+from experiment import Experiment
 
 if __name__ == '__main__':
+	Experiment.run()
 
-	params = Arguments.parse()
-	score = Train.run(params)
-
-	print('Test loss:', score[0])
-	print('Test accuracy:', score[1])
+	

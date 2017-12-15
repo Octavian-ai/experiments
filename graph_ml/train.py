@@ -1,14 +1,18 @@
 
+import os.path
+from datetime import datetime
+
 import keras
 import numpy as np
-from keras.callbacks import Callback
+import keras.callbacks
 
 from .model import Model
 from .dataset import Dataset
+from .path import generate_output_path
 
-class StopEarlyIfAbove(Callback):
+class StopEarlyIfAbove(keras.callbacks.Callback):
 	def __init__(self, monitor='val_acc', value=0.99, verbose=0):
-		super(Callback, self).__init__()
+		super(keras.callbacks.Callback, self).__init__()
 		self.monitor = monitor
 		self.value = value
 		self.verbose = verbose
@@ -34,18 +38,31 @@ class StopEarlyIfAbove(Callback):
 class Train(object):
 
 	@staticmethod
-	def run(params):
+	def run(experiment, dataset):
+
+		params = experiment.params
 
 		if params.random_seed is not None:
 			np.random.seed(params.random_seed)
 
-		dataset = Dataset.lazy_generate(params)
+		if params.verbose > 0:
+			print("Generate model")
+
 		model = Model.generate(params, dataset)
+		params_file = generate_output_path(experiment, ".hdf5")
+
+		if os.path.isfile(params_file) and params.load_weights:
+			model.load_weights(params_file)
 
 		callbacks = [
-			StopEarlyIfAbove(verbose=params.verbose)
+			StopEarlyIfAbove(verbose=params.verbose),
+			keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose),
+			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/"))
 		]
 		
+		if params.verbose > 0:
+			print("Begin training")
+
 		model.fit(dataset.train.x, dataset.train.y,
 			batch_size=params.batch_size,
 			epochs=params.epochs,
