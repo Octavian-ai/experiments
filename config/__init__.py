@@ -7,7 +7,6 @@ default_values = {
     'neo4j_password': 'local neo hates security!'
 }
 
-
 environment_box = Environment(None)
 
 

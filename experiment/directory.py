@@ -130,6 +130,6 @@ directory = {
 
 }
 
-default_experiment = "review_from_hidden_style_neighbor_conv"
+default_experiment = "style_from_neighbor_rnn"
 
 

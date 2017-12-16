@@ -9,7 +9,7 @@ name = "pypi"
 
 "neo4j-driver" = "*"
 tensorflow = "*"
-keras = "*"
+Keras = "*"
 numpy = "*"
 lazy = "*"
 "h5py" = "*"
