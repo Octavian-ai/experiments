@@ -15,7 +15,8 @@ def PolyActivation(m):
 	])
 
 
-# Use as activation function
+# Choose activation function for me
+# More efficient than PolyActivation
 # @returns Same sized tensor as input
 def PolySwitchActivation(m):
 	# will fail for shared nodes
@@ -82,7 +83,6 @@ class Model(object):
 				metrics=['accuracy'])
 
 		elif params.experiment == "style_from_neighbor_rnn":
-
 			# TODO: Move this into Experiment header
 			n_styles = 6
 			n_sequence = 100
