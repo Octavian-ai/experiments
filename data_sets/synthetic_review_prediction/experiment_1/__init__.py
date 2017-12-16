@@ -1,4 +1,4 @@
-from .configure import create_data_set_properties
+from .configure import create_data_set_properties, DATASET_NAME
 from .generate import run as _run
 
 

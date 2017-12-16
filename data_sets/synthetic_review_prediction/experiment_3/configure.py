@@ -4,8 +4,7 @@ from ..utils import WeightedOption, Distribution
 from ..classes import PersonStylePreferenceEnum, ProductStyleEnum, Style
 from graph_io.classes.dataset_name import DatasetName
 
-DATASET_NAME = DatasetName('synthetic_review_prediction experiment_2')
-
+DATASET_NAME = DatasetName('synthetic_review_prediction experiment_3')
 
 def create_data_set_properties() -> DataSetProperties:
     N_STYLES = 6
@@ -16,9 +15,8 @@ def create_data_set_properties() -> DataSetProperties:
         PersonStylePreferenceEnum.register('HAS_'+style.value, style)
 
     data_set_properties = DataSetProperties(
-        dataset_name=DATASET_NAME,
         n_reviews=12000,
-        n_companies=0,
+        n_companies=100,
         reviews_per_product=75,
         reviews_per_person_distribution=[
             WeightedOption[int](1, 0.5),
@@ -30,7 +28,11 @@ def create_data_set_properties() -> DataSetProperties:
         product_styles_distribution=Distribution[ProductStyleWeight, ProductStyleEnum]([
             ProductStyleWeight(x, 1) for x in ProductStyleEnum.iterate()
         ]),
-        person_company_number_of_relationships_distribution=[]
+        person_company_number_of_relationships_distribution=Distribution[ProductStyleWeight, ProductStyleEnum]([
+            WeightedOption[int](i, 1) for i in range(5) # equal probability of having opinion on 0-10 companies.
+            # #TODO what is the probability that someone will have an opinion on a company whose product they have actualy reviewed?
+            # We can also query cypher to find ^ out in our data set!
+        ])
     )
 
     return data_set_properties

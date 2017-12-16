@@ -55,4 +55,6 @@ class DynamicEnum(Generic[T]):
 
         assert count > 0
 
-        return [1 if i == idx else 0 for i in range(count)]
+        out = [1 if i == idx else 0 for i in range(count)]
+        assert sum(out) == 1
+        return out

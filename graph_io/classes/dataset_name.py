@@ -1,5 +1,5 @@
 from basic_types import NanoType
 
 
-class Style(NanoType[str]):
+class DatasetName(NanoType[str]):
     pass

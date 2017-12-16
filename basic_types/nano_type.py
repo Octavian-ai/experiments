@@ -16,6 +16,8 @@ class NanoType(Generic[T]):
         return self._value.__hash__()
 
     def __eq__(self, other):
+        if isinstance(other, NanoType):
+            return self._value.__eq__(other._value)
         return self._value.__eq__(other)
 
     def __ne__(self, other):

@@ -64,14 +64,13 @@ class Dataset(object):
 	def generate(cls, experiment):
 		params = experiment.params
 
-		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
+		global_params = QueryParams(golden=params.golden, dataset_name=experiment.directory[params.experiment].dataset_name, experiment=params.experiment)
 
 		class Recipe:
 			def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x, params:QueryParams=global_params):
 				self.split = split
 				self.finalize_x = finalize_x
 				self.params = params
-				
 
 		recipes = {
 			'review_from_visible_style': Recipe(

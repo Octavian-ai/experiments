@@ -2,6 +2,7 @@ import math
 from typing import List
 from ..utils import WeightedOption, choose_weighted_option, get_average_value, Distribution
 from ..classes import PersonStylePreferenceEnum, ProductStyleEnum
+from graph_io.classes.dataset_name import DatasetName
 
 
 class PersonStyleWeight(WeightedOption[PersonStylePreferenceEnum]):
@@ -18,12 +19,18 @@ class PersonStyleWeightDistribution(Distribution[PersonStyleWeight, PersonStyleP
 
 class DataSetProperties(object):
     def __init__(self,
+                 dataset_name: DatasetName,
                  n_reviews: int,
+                 n_companies: int,
                  reviews_per_product: float,
                  reviews_per_person_distribution: List[WeightedOption[int]],
                  person_styles_distribution: PersonStyleWeightDistribution,
-                 product_styles_distribution: Distribution[ProductStyleWeight, ProductStyleEnum]
+                 product_styles_distribution: Distribution[ProductStyleWeight, ProductStyleEnum],
+                 person_company_number_of_relationships_distribution: [Distribution[WeightedOption[int], int], None]
                  ):
+        self.dataset_name = dataset_name
+        self.n_companies = n_companies
+        self.person_company_number_of_relationships_distribution = person_company_number_of_relationships_distribution
         self.product_styles_distribution = product_styles_distribution
         self.person_styles_distribution = person_styles_distribution
         self.reviews_per_person_distribution = reviews_per_person_distribution

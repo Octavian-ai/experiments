@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from .graph_node import GraphNodeIdentifier, GraphNode, NodeLabel, IsGoldenFlag
-from .nano_type import NanoID, NanoType
+from basic_types import NanoID, NanoType
 from .style import Style
 from .dynamic_enum import DynamicEnum
 
@@ -23,7 +23,8 @@ class PersonStylePreference(NanoType[PersonStylePreferenceEnum]):
 
 
 class PersonMetaProperties(object):
-    def __init__(self, number_of_reviews: int):
+    def __init__(self, number_of_reviews: int, number_of_company_opinions: int):
+        self.number_of_company_opinions = number_of_company_opinions
         self.number_of_reviews = number_of_reviews
 
 
