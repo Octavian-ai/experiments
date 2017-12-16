@@ -128,6 +128,6 @@ directory = {
 
 }
 
-default_experiment = "review_from_visible_style"
+default_experiment = "style_from_neighbor_rnn"
 
 

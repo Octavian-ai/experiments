@@ -50,7 +50,7 @@ class Dataset(object):
 		else:
 			if params.verbose > 0:
 				print("Querying data from database")
-			d = Dataset.generate(params)
+			d = Dataset.generate(experiment)
 			pickle.dump(d, open(dataset_file, "wb"))
 
 		if params.verbose > 0:
@@ -61,7 +61,8 @@ class Dataset(object):
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
 	# This performs all transformations in-memory - it is not very efficient
 	@classmethod
-	def generate(cls, params):
+	def generate(cls, experiment):
+		params = experiment.params
 
 		global_params = QueryParams(golden=params.golden, experiment=params.experiment)
 
@@ -88,14 +89,16 @@ class Dataset(object):
 			)
 		}
 
-		return Dataset.execute_recipe(params, recipes[params.experiment])
+		return Dataset.execute_recipe(experiment, recipes[params.experiment])
 
 
 
 	@classmethod
-	def execute_recipe(cls, params, recipe):
+	def execute_recipe(cls, experiment, recipe):
+		params = experiment.params
+
 		with SimpleNodeClient() as client:
-			data = client.execute_cypher(CypherQuery(experiment.directory[params.experiment].cypher_query), recipe.params)
+			data = client.execute_cypher(CypherQuery(experiment.header.cypher_query), recipe.params)
 
 			# Once I get my shit together,
 			# 1) use iterators

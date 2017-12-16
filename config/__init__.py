@@ -2,21 +2,20 @@ from collections import defaultdict
 from .environment import Environment
 
 default_values = {
-    'neo4j_url': 'bolt://010e4dc7-staging.databases.neo4j.io',
+    'neo4j_url': 'bolt://796bafef-staging.databases.neo4j.io',
     'neo4j_user': 'readonly',
-    'neo4j_password': 'neo4j_movies_db!'
+    'neo4j_password': '0s3DGA6Zq'
 }
 
 overrides = defaultdict(dict)
 overrides.update(**{
     'andrew': {},
-    'david': {
-        'neo4j_url': 'bolt://796bafef-staging.databases.neo4j.io',
+    'david': {},
+    'floydhub': {},
+    'moviefan': {
+        'neo4j_url': 'bolt://010e4dc7-staging.databases.neo4j.io',
         'neo4j_user': 'readonly',
-        'neo4j_password': '0s3DGA6Zq'
-    },
-    'floydhub': {
-
+        'neo4j_password': 'neo4j_movies_db!'
     }
 })
 

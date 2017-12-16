@@ -88,7 +88,7 @@ class Model(object):
 			n_sequence = 100
 
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
-			m = LSTM(n_sequence)(neighbors)
+			m = LSTM(n_styles*4)(neighbors)
 			m = Dense(n_styles)(m)
 			m = Activation('sigmoid', name='final_activation')(m)
 
