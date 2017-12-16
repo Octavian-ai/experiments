@@ -13,7 +13,7 @@ class PersonWroteReview(GraphEdge[PersonID, ReviewID]):
 
 
 class ReviewOfProduct(GraphEdge[ReviewID, ProductID]):
-    RELATIONSHIP = RelationshipName("WROTE")
+    RELATIONSHIP = RelationshipName("OF")
 
     def __init__(self, review_id: ReviewID, product_id: ProductID, is_golden: IsGoldenFlag):
-        super(ReviewOfProduct, self).__init__(self.RELATIONSHIP, product_id, review_id, is_golden)
+        super(ReviewOfProduct, self).__init__(self.RELATIONSHIP, review_id, product_id, is_golden)

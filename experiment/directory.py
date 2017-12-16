@@ -1,11 +1,12 @@
-
-from collections import namedtuple
+from data_sets.synthetic_review_prediction import EXPERIMENT_1_DATASET, EXPERIMENT_2_DATASET, EXPERIMENT_3_DATASET
+from graph_io.classes import DatasetName
 
 
 class ExperimentHeader(object):
-	def __init__(self, doc, cypher_query, meta={}):
+	def __init__(self, doc, dataset_name: DatasetName, cypher_query, meta={}):
 		# Jesus I have to spell this out?!
 		# WTF are the python language devs doing?!
+		self.dataset_name = dataset_name
 		self.doc = doc
 		self.cypher_query = cypher_query
 		self.meta = meta
@@ -13,11 +14,11 @@ class ExperimentHeader(object):
 shared_query = {
 	"product_and_product_subgraph": """
 			MATCH p=
-				(a:PERSON {is_golden:{golden}}) 
-					-[:WROTE {is_golden:{golden}}]-> 
-				(b:REVIEW {is_golden:{golden}}) 
-					-[:OF {is_golden:{golden}}]-> 
-				(product:PRODUCT {is_golden:{golden}})
+				(a:PERSON {is_golden:{golden}, dataset_name:{dataset_name}}) 
+					-[:WROTE {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
+				(b:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
+					-[:OF {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
+				(product:PRODUCT {is_golden:{golden}, dataset_name:{dataset_name}})
 
 			WITH
 				product,
@@ -40,12 +41,13 @@ directory = {
 
 				review_score = dot(style_preference, product_style)
 			""",
+			EXPERIMENT_2_DATASET,
 			"""MATCH p=
-					(a:PERSON {is_golden:{golden}}) 
-						-[:WROTE {is_golden:{golden}}]-> 
-					(b:REVIEW {is_golden:{golden}}) 
-						-[:OF {is_golden:{golden}}]-> 
-					(c:PRODUCT {is_golden:{golden}})
+					(a:PERSON {is_golden:{golden}, dataset_name:{dataset_name}}) 
+						-[:WROTE {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
+					(b:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
+						-[:OF {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
+					(c:PRODUCT {is_golden:{golden}, dataset_name:{dataset_name}})
 				RETURN a.style_preference AS style_preference, c.style AS style, b.score AS score
 			"""
 		),
@@ -75,34 +77,32 @@ directory = {
 					- Train that!
 
 		""",
-
+		EXPERIMENT_2_DATASET,
 		"""
-			MATCH p=
-				(a:PERSON {is_golden:{golden}}) 
-					-[:WROTE {is_golden:{golden}}]-> 
-				(b:REVIEW {is_golden:{golden}}) 
-					-[:OF {is_golden:{golden}}]-> 
-				(c:PRODUCT {is_golden:{golden}})
-
-
-			WITH 
-			    a,b,c
-			MATCH others=
-			    (other_person:PERSON)
-			        -[:WROTE {is_golden:{golden}}]->
-			    (other_review:REVIEW {is_golden:{golden}})
-			        -[:OF {is_golden:{golden}}]->
+			MATCH (a:PERSON) 
+					-[e1:WROTE ]-> 
+				(b:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
+					-[e2:OF ]-> 
+				(c:PRODUCT),
+			others=
+			    (other_person:PERSON {is_golden:{golden}, dataset_name:{dataset_name}})
+			        -[:WROTE {is_golden:{golden}, dataset_name:{dataset_name}}]->
+			    (other_review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}})
+			        -[:OF {is_golden:{golden}, dataset_name:{dataset_name}}]->
 			    (c)
-			WHERE other_person<>a
-
+			WHERE other_person<>a AND other_review<>b 
 			WITH
-				a,
-				b,
+				a,b,c,
+                e1,e2,
 				COLLECT(others) as neighbors
-
-			RETURN 
-				a.style_preference AS style_preference, 
-				b.score AS score, 
+			WHERE a.dataset_name={dataset_name} AND a.is_golden={golden}
+            AND b.dataset_name={dataset_name} AND b.is_golden={golden}
+			AND c.dataset_name={dataset_name} AND c.is_golden={golden}
+			AND e1.dataset_name={dataset_name} AND e1.is_golden={golden}
+			AND e2.dataset_name={dataset_name} AND e2.is_golden={golden}
+            RETURN 
+				a.style_preference AS style_preference,
+				b.score AS score,
 				neighbors
 
 		"""
@@ -118,16 +118,18 @@ directory = {
 		This should be easy!!
 
 		""",
+		EXPERIMENT_2_DATASET,
 		shared_query["product_and_product_subgraph"]
 		),
 
 	"style_from_neighbor_rnn": ExperimentHeader(
 		""" The same as style_from_neighbor_conv but using an RNN instead of convolution """,
+		EXPERIMENT_2_DATASET,
 		shared_query["product_and_product_subgraph"]
 	)
 
 }
 
-default_experiment = "review_from_visible_style"
+default_experiment = "review_from_hidden_style_neighbor_conv"
 
 

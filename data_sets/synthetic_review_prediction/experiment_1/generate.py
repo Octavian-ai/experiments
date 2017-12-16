@@ -19,8 +19,8 @@ def run(client, data_set_properties: DataSetProperties):
 
         def create_indexes():
             client.execute_cypher_write(CypherQuery("CREATE INDEX ON :NODE(id)"), QueryParams())
-            client.execute_cypher_write(CypherQuery("CREATE INDEX ON :NODE(id, dataset_name)"), QueryParams())
-            client.execute_cypher_write(CypherQuery("CREATE INDEX ON :NODE(dataset_name)"), QueryParams())
+            #client.execute_cypher_write(CypherQuery("CREATE INDEX ON :NODE(id, dataset_name)"), QueryParams())
+            pass
 
         create_indexes()
 

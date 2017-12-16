@@ -2,7 +2,7 @@ from typing import Generic, TypeVar, List
 from uuid import UUID
 
 from .golden_flag import IsGoldenFlag
-from .nano_type import NanoType, NanoID
+from basic_types import NanoType, NanoID
 
 T = TypeVar('T')
 

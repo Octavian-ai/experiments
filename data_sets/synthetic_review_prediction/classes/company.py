@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 from .graph_node import NodeLabel, GraphNodeIdentifier, GraphNode, IsGoldenFlag
-from .nano_type import NanoType, NanoID
+from basic_types import NanoType, NanoID
 from .style import Style
 from .dynamic_enum import DynamicEnum
 

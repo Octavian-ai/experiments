@@ -50,11 +50,12 @@ class Model(object):
 		elif params.experiment == "review_from_hidden_style_neighbor_conv":
 
 			n_styles = 6
+			n_sequence = 100
 
-			neighbors = Input(shape=(100,n_styles+2,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			person = Input(shape=(n_styles,), dtype='float32', name='person')
 
-			m = cls.style_from_neighbors(neighbors, n_styles)
+			m = cls.style_from_neighbors(neighbors, n_styles, n_sequence)
 			m = Concatenate()([m, person])
 			m = Dense(n_styles*4)(m)
 			m = PolyActivation(m)

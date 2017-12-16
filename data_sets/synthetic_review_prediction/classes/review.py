@@ -3,7 +3,7 @@ from .golden_flag import IsGoldenFlag
 from .graph_node import GraphNode, GraphNodeIdentifier, NodeLabel
 from .person import PersonID
 from .product import ProductID
-from .nano_type import NanoType
+from basic_types import NanoType
 
 
 class ReviewID(GraphNodeIdentifier):

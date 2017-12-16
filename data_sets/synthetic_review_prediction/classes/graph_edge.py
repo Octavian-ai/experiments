@@ -1,5 +1,5 @@
 from typing import Generic, TypeVar
-from .nano_type import NanoType
+from basic_types import NanoType
 from .graph_node import GraphNode, GraphNodeIdentifier
 from .golden_flag import IsGoldenFlag
 

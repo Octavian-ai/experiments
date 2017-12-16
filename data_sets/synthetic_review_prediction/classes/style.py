@@ -1,4 +1,4 @@
-from .nano_type import NanoType
+from basic_types import NanoType
 
 
 class Style(NanoType[str]):
