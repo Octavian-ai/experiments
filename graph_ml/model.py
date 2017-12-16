@@ -36,6 +36,10 @@ class Model(object):
 	@classmethod
 	def generate(cls, params, dataset):
 
+		# TODO: Move this into Experiment header
+		n_styles = 6
+		n_sequence = 100
+
 		if params.experiment == "review_from_visible_style":
 			model = Sequential([
 				Dense(8, 
@@ -44,15 +48,8 @@ class Model(object):
 				Dense(1, activation='sigmoid'),
 			])
 
-			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.SGD(lr=0.3),
-				metrics=['accuracy'])
 
 		elif params.experiment == "review_from_hidden_style_neighbor_conv":
-
-			n_styles = 6
-			n_sequence = 100
-
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			person = Input(shape=(n_styles,), dtype='float32', name='person')
 
@@ -64,30 +61,15 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[person, neighbors], outputs=[m])
 
-			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.SGD(lr=0.3),
-				metrics=['accuracy'])
-
+		
 		elif params.experiment == "style_from_neighbor_conv":
-
-			# TODO: Move this into Experiment header
-			n_styles = 6
-			n_sequence = 100
-
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			m = cls.style_from_neighbors(neighbors, n_styles, n_sequence)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
-			model.compile(loss='categorical_crossentropy',
-				optimizer=keras.optimizers.SGD(lr=0.3),
-				metrics=['accuracy'])
 
 		elif params.experiment == "style_from_neighbor_rnn":
-			# TODO: Move this into Experiment header
-			n_styles = 6
-			n_sequence = 100
-
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			m = LSTM(n_styles*4)(neighbors)
 			m = Dense(n_styles)(m)
@@ -95,11 +77,29 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
-			print("Layers", model.layers)
+		elif params.experiment == "review_from_all_hidden":
+			neighbors = Input(shape=(n_sequence,3,), dtype='float32', name='neighbors')
+			m = Conv1D(10, 1, activation='tanh')(neighbors)
+			m = MaxPooling1D(n_sequence)(m)
+			m = Reshape([10])(m)
+			m = Dense(1)(m)
+			m = PolyActivation(m)
 
+			model = keras.models.Model(inputs=[neighbors], outputs=[m])
+
+
+		# Compile time!
+		if experiment.header.target == float:
+			model.compile(loss=keras.losses.mean_squared_error,
+				optimizer=keras.optimizers.SGD(lr=0.3),
+				metrics=['accuracy'])
+
+		elif experiment.header.target == list:
 			model.compile(loss='categorical_crossentropy',
 				optimizer=keras.optimizers.SGD(lr=0.3),
 				metrics=['accuracy'])
+
+
 
 		return model
 

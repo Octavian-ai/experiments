@@ -2,7 +2,7 @@ import json
 overrides = dict()
 
 overrides.update(**{
-    'david': {
+    'remote': {
         'neo4j_url': 'bolt://796bafef-staging.databases.neo4j.io',
         'neo4j_user': 'readonly',
         'neo4j_password': '0s3DGA6Zq'

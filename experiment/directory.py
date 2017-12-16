@@ -1,14 +1,18 @@
-from data_sets.synthetic_review_prediction import EXPERIMENT_1_DATASET, EXPERIMENT_2_DATASET, EXPERIMENT_3_DATASET
+from data_sets.synthetic_review_prediction import EXPERIMENT_1_DATASET, \
+	EXPERIMENT_2_DATASET, EXPERIMENT_3_DATASET, EXPERIMENT_4_DATASET
 from graph_io.classes import DatasetName
+
+from basic_types import NanoType
 
 
 class ExperimentHeader(object):
-	def __init__(self, doc, dataset_name: DatasetName, cypher_query, meta={}):
+	def __init__(self, doc, dataset_name: DatasetName, cypher_query, target, meta={}):
 		# Jesus I have to spell this out?!
 		# WTF are the python language devs doing?!
 		self.dataset_name = dataset_name
 		self.doc = doc
 		self.cypher_query = cypher_query
+		self.target = target
 		self.meta = meta
 
 shared_query = {
@@ -34,23 +38,24 @@ shared_query = {
 
 directory = {
 	"review_from_visible_style": ExperimentHeader(
-			"""
-				A simple baseline experiment.
+		"""
+			A simple baseline experiment.
 
-				From a person's style preference and a product's style, predict review score.
+			From a person's style preference and a product's style, predict review score.
 
-				review_score = dot(style_preference, product_style)
-			""",
-			EXPERIMENT_2_DATASET,
-			"""MATCH p=
-					(a:PERSON {is_golden:{golden}, dataset_name:{dataset_name}}) 
-						-[:WROTE {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
-					(b:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-						-[:OF {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
-					(c:PRODUCT {is_golden:{golden}, dataset_name:{dataset_name}})
-				RETURN a.style_preference AS style_preference, c.style AS style, b.score AS score
-			"""
-		),
+			review_score = dot(style_preference, product_style)
+		""",
+		EXPERIMENT_2_DATASET,
+		"""MATCH p=
+				(a:PERSON {is_golden:{golden}, dataset_name:{dataset_name}}) 
+					-[:WROTE {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
+				(b:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
+					-[:OF {is_golden:{golden}, dataset_name:{dataset_name}}]-> 
+				(c:PRODUCT {is_golden:{golden}, dataset_name:{dataset_name}})
+			RETURN a.style_preference AS style_preference, c.style AS style, b.score AS score
+		""",
+		float
+	),
 
 
 	"review_from_hidden_style_neighbor_conv": ExperimentHeader(
@@ -105,8 +110,96 @@ directory = {
 				b.score AS score,
 				neighbors
 
+		""",
+		float
+	),
+
+	"review_from_all_hidden": ExperimentHeader(
 		"""
-		),
+			# Objective
+
+			Learn a function `score(person, product)` that gives a product review
+			given a person and a product.
+
+			## Input format
+
+			People, reviews and products are essentially anonymous and defined by their relationship
+			to each-other.
+
+			Our network needs to take in a portion of the graph then output the predicted score.
+
+			The graph is transformed and formatted in a consistent fashion, allowing the network
+			to understand which person and product is being input.
+
+
+			# Data generation model
+
+			People generate reviews of products.
+
+			If the product's style matches a person's style_preference, their review is positive.
+
+			product_style and style_preference are both hidden.
+
+			`review_score = style_preference . product_style`
+
+			We need to model:
+				- person's style preference
+				- product's style
+				- then combine
+
+
+			# Solution ideas:
+
+			- use lookalikes in the query
+				```
+				def score(person:PERSON, product:PRODUCT):
+					return q("MATCH (person) -> (:REVIEW{score:1}) -> () <- (:REVIEW{score:1}) <- (a:PERSON) -> (r:REVIEW) -> (product) RETURN r.score")
+				```
+
+			- allow the network to find look-a-likes by generating array of person-product chains
+
+			- adjacency matrix, network builds specialized-rnn that re-orders it to cluster
+
+
+
+
+		""",
+		EXPERIMENT_4_DATASET,
+		"""
+			MATCH g=(input_person:PERSON) 
+					-[:WROTE]-> 
+				(target_review:REVIEW {dataset_name:{dataset_name}}) 
+					-[:OF]-> 
+				(input_product:PRODUCT)
+					<-[:OF]-
+				(review1:REVIEW)
+					<-[:WROTE]-
+				(person2:PERSON)
+					-[:WROTE]->
+				(review2:REVIEW)
+					-[:OF]->
+				(product2:PRODUCT)
+					<-[:OF]-
+				(review3:REVIEW)
+					<-[:WROTE]-
+				(input_person)
+			
+			WHERE input_person<>person2 AND input_product<>product2 
+			WITH
+				input_person,
+				input_product,
+				target_review,
+				COLLECT(g) as neighbors
+            RETURN 
+				input_person,
+				input_product,
+				neighbors,
+				target_review
+
+
+		""",
+		float
+	),
 
 	"style_from_neighbor_conv": ExperimentHeader(
 		""" 
@@ -119,13 +212,15 @@ directory = {
 
 		""",
 		EXPERIMENT_2_DATASET,
-		shared_query["product_and_product_subgraph"]
-		),
+		shared_query["product_and_product_subgraph"],
+		list,
+	),
 
 	"style_from_neighbor_rnn": ExperimentHeader(
 		""" The same as style_from_neighbor_conv but using an RNN instead of convolution """,
 		EXPERIMENT_2_DATASET,
-		shared_query["product_and_product_subgraph"]
+		shared_query["product_and_product_subgraph"],
+		list
 	)
 
 }

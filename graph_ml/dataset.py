@@ -64,7 +64,7 @@ class Dataset(object):
 	def generate(cls, experiment):
 		params = experiment.params
 
-		global_params = QueryParams(golden=params.golden, dataset_name=experiment.directory[params.experiment].dataset_name, experiment=params.experiment)
+		global_params = QueryParams(golden=params.golden, dataset_name=experiment.header.dataset_name, experiment=params.experiment)
 
 		class Recipe:
 			def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x, params:QueryParams=global_params):
@@ -77,7 +77,7 @@ class Dataset(object):
 				lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
 			),
 			'review_from_hidden_style_neighbor_conv': Recipe(
-				DatasetHelpers.review_from_hidden_style_neighbor_conv,
+				DatasetHelpers.review_from_hidden_style_neighbor_conv(100),
 				lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
 			),
 			'style_from_neighbor_conv': Recipe(
@@ -85,6 +85,9 @@ class Dataset(object):
 			),
 			'style_from_neighbor_rnn': Recipe(
 				DatasetHelpers.style_from_neighbor(100)
+			),
+			'review_from_all_hidden': Recipe(
+				DatasetHelpers.review_from_all_hidden
 			)
 		}
 
@@ -153,18 +156,22 @@ class Dataset(object):
 
 class DatasetHelpers(object):
 
+	@staticmethod
+	def path_map_style_preference_score(cls, path):
+		other_person = path.nodes[0]
+		other_review = path.nodes[1]
+		return np.concatenate((
+				np.array(other_person.properties['style_preference']),
+				[other_review.properties['score']]
+			))
+
 	# Turn neighbors sub-graph into a sampled array of neighbours
 	# @argument length What size of array should be returned. Use None for variable. If you request a fixed length, the first column of the feature is a 0.0/1.0 flag of where there is data or zeros in that feature row
 	@classmethod
-	def collect_neighbors(cls, row, key, length:int=100):
+	def collect_neighbors(cls, row, key, path_map, length:int):
 		subrows = []
 		for path in row[key]:
-			other_person = path.nodes[0]
-			other_review = path.nodes[1]
-			subrows.append(np.concatenate((
-				np.array(other_person.properties['style_preference']),
-				[other_review.properties['score']]
-			)))
+			subrows.append(path_map(path))
 
 		# Lets always shuffle to keep the network on its toes
 		# If you use --random-seed you'll fix this to be the same each run
@@ -186,9 +193,11 @@ class DatasetHelpers(object):
 
 
 	@classmethod
-	def review_from_hidden_style_neighbor_conv(cls, row):
-		neighbors = cls.collect_neighbors(row, 'neighbors')
-		return Point({'person': np.array(row["style_preference"]), 'neighbors':neighbors}, row["score"])
+	def review_from_hidden_style_neighbor_conv(cls, length):
+		def transform_row(row):
+			neighbors = cls.collect_neighbors(row, 'neighbors', cls.path_map_style_preference_score)
+			return Point({'person': np.array(row["style_preference"]), 'neighbors':neighbors}, row["score"])
+		return transform_row
 
 	@classmethod
 	def style_from_neighbor(cls, length):
@@ -196,9 +205,24 @@ class DatasetHelpers(object):
 		# Seriously, coffeescript has all these things sorted out
 		# Like no anonymous functions? Fuck you.
 		def transform_row(row):
-			neighbors = cls.collect_neighbors(row, 'neighbors', length)
+			neighbors = cls.collect_neighbors(row, 'neighbors', cls.path_map_style_preference_score, length)
 			return Point(neighbors, row["product"].properties["style"])
 		return transform_row
+
+	@staticmethod
+	def review_from_all_hidden(row):
+		def path_map(path):
+			print(path)
+			return np.array([
+				path.nodes["review1"].properties["score"],
+				path.nodes["review2"].properties["score"],
+				path.nodes["review3"].properties["score"]
+			])
+
+		neighbors = cls.collect_neighbors(row, 'neighbors', path_map, 100)
+		return Point(neighbors, row["target_review"].properties["score"])
+
+
 
 
 
