@@ -6,6 +6,7 @@ import os.path
 import hashlib
 import neo4j
 from typing import Callable
+import logging
 
 import keras
 import numpy as np
@@ -43,18 +44,18 @@ class Dataset(object):
 		dataset_file = generate_output_path(experiment, '.pkl')
 
 		if os.path.isfile(dataset_file) and params.lazy:
-			if params.verbose > 0:
-				print("Opening data pickle")
+			logging.info("Opening data pickle")
 			d = pickle.load(open(dataset_file, "rb"))
 
 		else:
-			if params.verbose > 0:
-				print("Querying data from database")
+			logging.info("Querying data from database")
 			d = Dataset.generate(experiment)
 			pickle.dump(d, open(dataset_file, "wb"))
 
-		if params.verbose > 0:
-			print("Test data sample: ", list(zip(d.test.x, d.test.y))[:10])
+		logging.info(f"Test data sample: {str(list(zip(d.test.x, d.test.y))[:10])}")
+
+		if len(d.test.x) == 0 or len(d.train.x) == 0:
+			logging.error("Dataset too small to provide test and training data, this run will fail")
 
 		return d
 
@@ -87,7 +88,7 @@ class Dataset(object):
 				DatasetHelpers.style_from_neighbor(100)
 			),
 			'review_from_all_hidden': Recipe(
-				DatasetHelpers.review_from_all_hidden
+				DatasetHelpers.review_from_all_hidden(experiment.header.meta["neighbor_count"])
 			)
 		}
 
@@ -112,9 +113,8 @@ class Dataset(object):
 			if len(data) == 0:
 				raise Exception('Neo4j query returned no data, cannot train the network') 
 
-			if params.verbose > 1:
-				print("Retrieved {} rows from Neo4j".format(len(data)))
-				print("Data sample: ", data[:10])
+			logging.info(f"Retrieved {len(data)} rows from Neo4j")
+			logging.info(f"Data sample: {str(data[:10])}")
 
 			xy = [recipe.split(i) for i in data]
 
@@ -199,6 +199,7 @@ class DatasetHelpers(object):
 			return Point({'person': np.array(row["style_preference"]), 'neighbors':neighbors}, row["score"])
 		return transform_row
 
+
 	@classmethod
 	def style_from_neighbor(cls, length):
 		# Python you suck at developer productivity.
@@ -209,18 +210,19 @@ class DatasetHelpers(object):
 			return Point(neighbors, row["product"].properties["style"])
 		return transform_row
 
-	@staticmethod
-	def review_from_all_hidden(row):
-		def path_map(path):
-			# Indices suck, I want to use names
-			return np.array([
-				path.nodes[3].properties["score"],
-				path.nodes[5].properties["score"],
-				path.nodes[7].properties["score"]
-			])
 
-		neighbors = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 100)
-		return Point(neighbors, row["target_review"].properties["score"])
+	@classmethod
+	def review_from_all_hidden(cls, length):
+		def t(row):
+			neighbors = np.array(row["neighbors"])
+			delta = length - neighbors.shape[0]
+
+			if delta > 0:
+				neighbors = np.pad(neighbors, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+			
+			return Point(neighbors, row["score"])
+
+		return t
 
 
 

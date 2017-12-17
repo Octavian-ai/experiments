@@ -9,10 +9,12 @@ name = "pypi"
 
 "neo4j-driver" = "*"
 tensorflow = "*"
-Keras = "*"
+keras = "*"
 numpy = "*"
 lazy = "*"
 "h5py" = "*"
+colorama = "*"
+coloredlogs = "*"
 
 
 [dev-packages]

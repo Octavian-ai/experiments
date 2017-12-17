@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "4e71796958b9cf47250002e6e2cd4303b799f7a09ff2e6e25764d73e07b2f7ba"
+            "sha256": "4b4bb335548a0dac6062ae5c33861c2c26b119f0743041beac71bbf193f17af5"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -40,6 +40,20 @@
                 "sha256:978e758599b54cd3caa2e160d74102879b230ea8dc93871d0783721eef58bc65"
             ],
             "version": "==1.5.0"
+        },
+        "colorama": {
+            "hashes": [
+                "sha256:463f8483208e921368c9f306094eb6f725c6ca42b0f97e313cb5d5512459feda",
+                "sha256:48eb22f4f8461b1df5734a074b57042430fb06e1d61bd1e11b078c0fe6d7a1f1"
+            ],
+            "version": "==0.3.9"
+        },
+        "coloredlogs": {
+            "hashes": [
+                "sha256:f08ee2a2cef08163ddd24596e48cba2243937abf915d7fb37d62254596b816a9",
+                "sha256:2725d12281946c459154e9bb28cd1efca257c22d2b3dfe69ae4bf9b5ef5cf57c"
+            ],
+            "version": "==7.3.1"
         },
         "enum34": {
             "hashes": [
@@ -100,6 +114,13 @@
             ],
             "version": "==0.9999999"
         },
+        "humanfriendly": {
+            "hashes": [
+                "sha256:43a43575cc5c1506a50fb5a536757aa0c2ae94c0ec10572b368510c878fdc0b9",
+                "sha256:f1ebb406d37478228b92543c12c27c9a827782d8d241260b3a06512c7f7c3a5e"
+            ],
+            "version": "==4.4.1"
+        },
         "keras": {
             "hashes": [
                 "sha256:eb7f2345ca7d5072ede8b43a5f4c2924e8429046cdaa6fe09e97a7b7e00fa088",
@@ -125,6 +146,14 @@
                 "sha256:b158b6df76edd239b8208d481dc46b6afd45a846b7812ff0ce58971cf5bc8bba"
             ],
             "version": "==2.0.0"
+        },
+        "monotonic": {
+            "hashes": [
+                "sha256:0bcd2b14e3b7ee7cfde796e408176ceffa01d89646f2e532964ef2aae0c9fa3e",
+                "sha256:a02611d5b518cd4051bf22d21bd0ae55b3a03f2d2993a19b6c90d9d168691f84"
+            ],
+            "markers": "python_version == '2.6' or python_version == '2.7' or python_version == '3.0' or python_version == '3.1' or python_version == '3.2'",
+            "version": "==1.4"
         },
         "neo4j-driver": {
             "hashes": [
@@ -268,7 +297,6 @@
                 "sha256:e721e53864f084f956f40f96124a74da0631ac13fbbd1ba99e8e2b5e9cafdf64",
                 "sha256:9515fe0a94e823fd90b08d22de45d7bde57c90edce705b22f5e1ecf7e1b653c8"
             ],
-            "markers": "python_version < '3'",
             "version": "==0.30.0"
         }
     },

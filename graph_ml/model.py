@@ -84,12 +84,14 @@ class Model(object):
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
 		elif params.experiment == "review_from_all_hidden":
-			neighbors = Input(shape=(n_sequence,4,), dtype='float32', name='neighbors')
-			m = Conv1D(10, 1, activation='tanh')(neighbors)
-			m = MaxPooling1D(n_sequence)(m)
-			m = Reshape([10])(m)
+			thinking_width = 10
+
+			neighbors = Input(shape=(experiment.header.meta["neighbor_count"],3,), dtype='float32', name='neighbors')
+			m = Conv1D(thinking_width, 1, activation='tanh')(neighbors)
+			m = MaxPooling1D(experiment.header.meta["neighbor_count"])(m)
+			m = Reshape([thinking_width])(m)
 			m = Dense(1)(m)
-			m = Activation('sigmoid')(m)
+			m = Activation("sigmoid", name='final_activation')(m)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 

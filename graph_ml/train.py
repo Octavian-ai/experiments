@@ -1,6 +1,7 @@
 
 import os.path
 from datetime import datetime
+import logging
 
 import keras
 import numpy as np
@@ -45,8 +46,7 @@ class Train(object):
 		if params.random_seed is not None:
 			np.random.seed(params.random_seed)
 
-		if params.verbose > 0:
-			print("Generate model")
+		logging.info("Generate model")
 
 		model = Model.generate(experiment, dataset)
 		params_file = generate_output_path(experiment, ".hdf5")
@@ -60,8 +60,7 @@ class Train(object):
 			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/"))
 		]
 		
-		if params.verbose > 0:
-			print("Begin training")
+		logging.info("Begin training")
 
 		model.fit(dataset.train.x, dataset.train.y,
 			batch_size=params.batch_size,

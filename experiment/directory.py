@@ -184,20 +184,23 @@ directory = {
 					<-[:WROTE]-
 				(input_person)
 			
-			WHERE input_person<>person2 AND input_product<>product2 
-			WITH
-				input_person,
-				input_product,
-				target_review,
-				COLLECT(g)[0..100] as neighbors
-            RETURN 
-				input_person,
-				input_product,
-				neighbors,
-				target_review
+			WHERE 
+				input_person<>person2 
+				AND input_product<>product2 
+
+			RETURN
+				target_review.score as score,
+				COLLECT([review1.score, review2.score, review3.score])[0..50] as neighbors,
+
+				// These two need to be here otherwise the query implicitly groups by score
+				input_product.id,
+				input_person.id
 
 		""",
-		float
+		float,
+		{
+			"neighbor_count":50
+		}
 	),
 
 	"style_from_neighbor_conv": ExperimentHeader(
