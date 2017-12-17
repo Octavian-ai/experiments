@@ -212,14 +212,14 @@ class DatasetHelpers(object):
 	@staticmethod
 	def review_from_all_hidden(row):
 		def path_map(path):
-			print(path)
+			# Indices suck, I want to use names
 			return np.array([
-				path.nodes["review1"].properties["score"],
-				path.nodes["review2"].properties["score"],
-				path.nodes["review3"].properties["score"]
+				path.nodes[3].properties["score"],
+				path.nodes[5].properties["score"],
+				path.nodes[7].properties["score"]
 			])
 
-		neighbors = cls.collect_neighbors(row, 'neighbors', path_map, 100)
+		neighbors = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 100)
 		return Point(neighbors, row["target_review"].properties["score"])
 
 

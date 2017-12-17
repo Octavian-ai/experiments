@@ -3,13 +3,18 @@ import keras
 from keras.models import Sequential, Model
 from keras.layers import *
 
+
 # Rainbow sprinkles for your activation function
+# Try to use all activation functions
 # @argument m: (?,N) tensor
 # @returns (?,N*5) tensor
 def PolyActivation(m):
 	# wildcard of the day - let's do inception style activation because I've no idea which is best
 	# and frequently I get great boosts from switching activation functions
 	activations = ['tanh', 'sigmoid', 'softmax', 'softplus', 'relu']
+
+	# TODO: Add dense layer to resize back to original size
+	# I cannot work out how to do that in Keras yet :/
 	return Concatenate()([
 		Activation(i)(m) for i in activations
 	])
@@ -34,7 +39,8 @@ def PolySwitchActivation(m):
 class Model(object):
 
 	@classmethod
-	def generate(cls, params, dataset):
+	def generate(cls, experiment, dataset):
+		params = experiment.params
 
 		# TODO: Move this into Experiment header
 		n_styles = 6
@@ -78,12 +84,12 @@ class Model(object):
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
 		elif params.experiment == "review_from_all_hidden":
-			neighbors = Input(shape=(n_sequence,3,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(n_sequence,4,), dtype='float32', name='neighbors')
 			m = Conv1D(10, 1, activation='tanh')(neighbors)
 			m = MaxPooling1D(n_sequence)(m)
 			m = Reshape([10])(m)
 			m = Dense(1)(m)
-			m = PolyActivation(m)
+			m = Activation('sigmoid')(m)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 

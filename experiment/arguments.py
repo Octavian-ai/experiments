@@ -13,7 +13,7 @@ class Arguments(object):
 		parser.add_argument('--batch_size', type=int, default=16)
 		parser.add_argument('--epochs', type=int, default=100)
 		parser.add_argument('--random-seed', type=int, default=None)
-		parser.add_argument('--verbose', type=int, default=0)
+		parser.add_argument('--verbose', type=int, default=1)
 
 		parser.add_argument('--golden', action='store_true')
 		parser.add_argument('--lazy', action='store_true')

@@ -189,13 +189,12 @@ directory = {
 				input_person,
 				input_product,
 				target_review,
-				COLLECT(g) as neighbors
+				COLLECT(g)[0..100] as neighbors
             RETURN 
 				input_person,
 				input_product,
 				neighbors,
 				target_review
-
 
 		""",
 		float

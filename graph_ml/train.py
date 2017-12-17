@@ -48,7 +48,7 @@ class Train(object):
 		if params.verbose > 0:
 			print("Generate model")
 
-		model = Model.generate(params, dataset)
+		model = Model.generate(experiment, dataset)
 		params_file = generate_output_path(experiment, ".hdf5")
 
 		if os.path.isfile(params_file) and params.load_weights:
