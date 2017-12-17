@@ -44,15 +44,17 @@ class Dataset(object):
 		dataset_file = generate_output_path(experiment, '.pkl')
 
 		if os.path.isfile(dataset_file) and params.lazy:
-			logging.info("Opening data pickle")
+			logging.info(f"Opening dataset pickle {dataset_file}")
 			d = pickle.load(open(dataset_file, "rb"))
 
 		else:
 			logging.info("Querying data from database")
 			d = Dataset.generate(experiment)
 			pickle.dump(d, open(dataset_file, "wb"))
+			logging.info(f"Saved dataset pickle {dataset_file}")
 
-		logging.info(f"Test data sample: {str(list(zip(d.test.x, d.test.y))[:10])}")
+
+		logging.info(f"Test data sample: {str(list(zip(d.test.x, d.test.y))[:1])}")
 
 		if len(d.test.x) == 0 or len(d.train.x) == 0:
 			logging.error("Dataset too small to provide test and training data, this run will fail")
@@ -114,7 +116,7 @@ class Dataset(object):
 				raise Exception('Neo4j query returned no data, cannot train the network') 
 
 			logging.info(f"Retrieved {len(data)} rows from Neo4j")
-			logging.info(f"Data sample: {str(data[:10])}")
+			logging.info(f"Database sample: {str(data[:1])}")
 
 			xy = [recipe.split(i) for i in data]
 
