@@ -62,16 +62,18 @@ class Train(object):
 		
 		logging.info("Begin training")
 
-		model.fit(dataset.train.x, dataset.train.y,
-			batch_size=params.batch_size,
+		model.fit_generator(
+			generator=dataset.train_generator,
+			validation_data=dataset.validation_generator,
+			validation_steps=dataset.validation_steps,
 			epochs=params.epochs,
 			verbose=params.verbose,
-			validation_split=0.1,
+			steps_per_epoch=dataset.steps_per_epoch,
 			shuffle=True,
 			callbacks=callbacks
 		)
 
-		score = model.evaluate(dataset.test.x, dataset.test.y, verbose=0)
+		score = model.evaluate_generator(dataset.test_generator)
 
 		if score[1] < 1.0 and params.verbose > 1:
 			for layer in model.layers:

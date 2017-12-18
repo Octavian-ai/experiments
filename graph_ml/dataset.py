@@ -7,6 +7,8 @@ import hashlib
 import neo4j
 from typing import Callable
 import logging
+import itertools
+import more_itertools
 
 import keras
 import numpy as np
@@ -33,6 +35,10 @@ class Point(object):
 		return "{x: " + str(self.x) + ",\ny: " + str(self.y) + "}"
 
 
+class Recipe:
+	def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x):
+		self.split = split
+		self.finalize_x = finalize_x
 
 
 class Dataset(object):
@@ -42,22 +48,24 @@ class Dataset(object):
 		params = experiment.params
 		
 		dataset_file = generate_output_path(experiment, '.pkl')
+		david_has_made_this_work_for_generators = False
 
-		if os.path.isfile(dataset_file) and params.lazy:
+		if os.path.isfile(dataset_file) and params.lazy and david_has_made_this_work_for_generators:
 			logging.info(f"Opening dataset pickle {dataset_file}")
 			d = pickle.load(open(dataset_file, "rb"))
 
 		else:
 			logging.info("Querying data from database")
 			d = Dataset.generate(experiment)
-			pickle.dump(d, open(dataset_file, "wb"))
-			logging.info(f"Saved dataset pickle {dataset_file}")
 
+			if david_has_made_this_work_for_generators:
+				pickle.dump(d, open(dataset_file, "wb"))
+				logging.info(f"Saved dataset pickle {dataset_file}")
 
-		logging.info(f"Test data sample: {str(list(zip(d.test.x, d.test.y))[:1])}")
+		# logging.info(f"Test data sample: {str(list(zip(d.test.x, d.test.y))[:1])}")
 
-		if len(d.test.x) == 0 or len(d.train.x) == 0:
-			logging.error("Dataset too small to provide test and training data, this run will fail")
+		# if len(d.test.x) == 0 or len(d.train.x) == 0:
+		# 	logging.error("Dataset too small to provide test and training data, this run will fail")
 
 		return d
 
@@ -65,16 +73,7 @@ class Dataset(object):
 	# This performs all transformations in-memory - it is not very efficient
 	@classmethod
 	def generate(cls, experiment):
-		params = experiment.params
-
-		global_params = QueryParams(golden=params.golden, dataset_name=experiment.header.dataset_name, experiment=params.experiment)
-
-		class Recipe:
-			def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x, params:QueryParams=global_params):
-				self.split = split
-				self.finalize_x = finalize_x
-				self.params = params
-
+		
 		recipes = {
 			'review_from_visible_style': Recipe(
 				lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
@@ -89,71 +88,78 @@ class Dataset(object):
 			'style_from_neighbor_rnn': Recipe(
 				DatasetHelpers.style_from_neighbor(100)
 			),
-			'review_from_all_hidden': Recipe(
+			'review_from_all_hidden_simple_unroll': Recipe(
 				DatasetHelpers.review_from_all_hidden(experiment.header.meta["neighbor_count"])
+			),
+			'review_from_all_hidden_patch_rnn': Recipe(
+				DatasetHelpers.review_from_all_hidden_patch_rnn
 			)
 		}
 
-		return Dataset.execute_recipe(experiment, recipes[params.experiment])
+		return Dataset(experiment, recipes[experiment.name])
 
-
-
-	@classmethod
-	def execute_recipe(cls, experiment, recipe):
-		params = experiment.params
-
-		with SimpleNodeClient() as client:
-			data = client.execute_cypher(CypherQuery(experiment.header.cypher_query), recipe.params)
-
-			# Once I get my shit together,
-			# 1) use iterators
-			# 2) move to streaming
-			# 3) move to hdf5
-
-			data = list(data) # so we can do a few passes
-
-			if len(data) == 0:
-				raise Exception('Neo4j query returned no data, cannot train the network') 
-
-			logging.info(f"Retrieved {len(data)} rows from Neo4j")
-			logging.info(f"Database sample: {str(data[:1])}")
-
-			xy = [recipe.split(i) for i in data]
-
-			return Dataset(params, recipe, data, xy)
 		
 
 	# Split data into test/train set, organise it into a class
-	def __init__(self, params, recipe, data, xy):
-		self.params = params
-		self.data = data
-		self.data_xy = xy
+	def __init__(self, experiment, recipe):
 
-		self.input_shape = (len(xy[0].x),)
+		self.experiment = experiment
+		self.recipe = recipe
 
-		self.train = Point([], [])
-		self.test = Point([], [])
-
-		if params.random_seed is not None:
+		if experiment.params.random_seed is not None:
 			random.seed(params.random_seed)
 
-		def store_datum(i):
-			r = random.random()
-			if r > 0.9:
-				self.test.append(i)
-			else:
-				self.train.append(i)
+		global_params = QueryParams(
+			golden=experiment.params.golden, 
+			dataset_name=experiment.header.dataset_name, 
+			experiment=experiment.name)
 
-		for i in self.data_xy:
-			store_datum(i)
+		with SimpleNodeClient() as client:
 
-		# Yuck. fix later.
-		self.train.x = recipe.finalize_x(np.array(self.train.x))
-		self.train.y = np.array(self.train.y)
+			def run_query():
+				return client.run(CypherQuery(experiment.header.cypher_query), global_params)
 
-		self.test.x = recipe.finalize_x(np.array(self.test.x))
-		self.test.y = np.array(self.test.y)
+			self.statement_result = run_query()
 
+			def generate_all():
+				for i in self.statement_result:
+
+					p = recipe.split(i)
+					p.x = recipe.finalize_x(p.x)
+
+					r = random.random()
+					if r > 0.9:
+						l = "test"
+					elif r > 0.8:
+						l = "validate"
+					else:
+						l = "train"
+
+					yield (l, p)
+
+			# It seems like Neo4J cannot tell us number of records to expect
+			# without us fetching them ALL :(
+			total_data = len(run_query().data())
+
+			def chunk_train_data():
+				just_trainy = (i[1] for i in self.stream if i[0] == "train")
+				chunky = more_itertools.chunked(just_trainy, experiment.params.batch_size)
+
+				for i in chunky:
+					xs = np.array([j.x for j in i])
+					ys = np.array([j.y for j in i])
+					yield (xs, ys)
+
+			self.stream = more_itertools.peekable(generate_all())
+			self.train_generator 		= itertools.cycle(chunk_train_data())
+			self.validation_generator 	= itertools.cycle(((i[1].x, i[1].y) for i in self.stream if i[0] == "validate"))
+			self.test_generator 		= ((i[1].x, i[1].y) for i in self.stream if i[0] == "test")
+			
+			# These are not exact counts since the data is randomly split at generation time
+			self.validation_steps = int(total_data * 0.1)
+			self.steps_per_epoch = int(total_data * 0.8 / experiment.params.batch_size)
+
+			self.input_shape = (len(self.stream.peek()[0]),)
 
 
 class DatasetHelpers(object):
@@ -223,6 +229,32 @@ class DatasetHelpers(object):
 				neighbors = np.pad(neighbors, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
 			
 			return Point(neighbors, row["score"])
+
+		return t
+
+	@staticmethod
+	def review_from_all_hidden_patch_rnn(experiment):
+
+		def extract_label(l):
+			return list(l - set('NODE'))[0]
+
+		def package_node(n,l):
+			score = n.properties.get("score", -1.0)
+
+			if random.random() < experiment.header.meta["target_dropout"]:
+				score = -1.0
+
+			label = extract_label(l)
+			return [score,label, np.zero(experiment.header.meta["state"])]
+
+		def path_map(i):
+			return package_node(i[0], i[1])
+
+		def t(row):
+			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 20)
+			x = (package_node(row["node"], row["labels(node)"]), n)
+
+			return Point(x, row["node"].properties["score"])
 
 		return t
 

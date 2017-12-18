@@ -114,11 +114,11 @@ directory = {
 		float
 	),
 
-	"review_from_all_hidden": ExperimentHeader(
+	"review_from_all_hidden_simple_unroll": ExperimentHeader(
 		"""
 			# Objective
 
-			Learn a function `score(person, product)` that gives a product review
+			Learn a function `score(input_person, input_product)` that gives a product review
 			given a person and a product.
 
 			## Input format
@@ -131,37 +131,14 @@ directory = {
 			The graph is transformed and formatted in a consistent fashion, allowing the network
 			to understand which person and product is being input.
 
+			# Solution
+	
+			Allow the network to find look-a-likes by generating array of person-product-person-product-person chains
 
-			# Data generation model
+			E.g. If me and my lookalike both liked product X, then we'll agree for product Y
 
-			People generate reviews of products.
-
-			If the product's style matches a person's style_preference, their review is positive.
-
-			product_style and style_preference are both hidden.
-
-			`review_score = style_preference . product_style`
-
-			We need to model:
-				- person's style preference
-				- product's style
-				- then combine
-
-
-			# Solution ideas:
-
-			- use lookalikes in the query
-				```
-				def score(person:PERSON, product:PRODUCT):
-					return q("MATCH (person) -> (:REVIEW{score:1}) -> () <- (:REVIEW{score:1}) <- (a:PERSON) -> (r:REVIEW) -> (product) RETURN r.score")
-				```
-
-			- allow the network to find look-a-likes by generating array of person-product chains
-
-			- adjacency matrix, network builds specialized-rnn that re-orders it to cluster
-
-
-
+			This has a limitation that it can only successfully predict a score of there happens to be someone
+			with the same style_preference who has reviewed a product you have also reviewed.
 
 		""",
 		EXPERIMENT_4_DATASET,
@@ -190,16 +167,41 @@ directory = {
 
 			RETURN
 				target_review.score as score,
-				COLLECT([review1.score, review2.score, review3.score])[0..50] as neighbors,
+				COLLECT([1.0, review1.score, review2.score, review3.score])[0..50] as neighbors,
 
 				// These two need to be here otherwise the query implicitly groups by score
 				input_product.id,
 				input_person.id
 
+			LIMIT 100
+
 		""",
 		float,
 		{
 			"neighbor_count":50
+		}
+	),
+
+	"review_from_all_hidden_patch_rnn": ExperimentHeader(
+		"""
+			Let's try to do a RNN that operates on pieces of the graph
+
+		""",
+		EXPERIMENT_4_DATASET,
+		"""
+			MATCH g=(node {dataset_name:{dataset_name}}) --> (otherNode)
+
+			RETURN
+				node,
+				labels(node),
+				COLLECT([otherNode, labels(otherNode)]) as neighbors
+
+		""",
+		"Special",
+		{
+			"target_dropout": 0.1,
+			"state": 8,
+			"generator": True
 		}
 	),
 

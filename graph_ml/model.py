@@ -46,7 +46,7 @@ class Model(object):
 		n_styles = 6
 		n_sequence = 100
 
-		if params.experiment == "review_from_visible_style":
+		if experiment.name == "review_from_visible_style":
 			model = Sequential([
 				Dense(8, 
 					input_shape=dataset.input_shape,
@@ -55,7 +55,7 @@ class Model(object):
 			])
 
 
-		elif params.experiment == "review_from_hidden_style_neighbor_conv":
+		elif experiment.name == "review_from_hidden_style_neighbor_conv":
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			person = Input(shape=(n_styles,), dtype='float32', name='person')
 
@@ -68,14 +68,14 @@ class Model(object):
 			model = keras.models.Model(inputs=[person, neighbors], outputs=[m])
 
 		
-		elif params.experiment == "style_from_neighbor_conv":
+		elif experiment.name == "style_from_neighbor_conv":
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			m = cls.style_from_neighbors(neighbors, n_styles, n_sequence)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
 
-		elif params.experiment == "style_from_neighbor_rnn":
+		elif experiment.name == "style_from_neighbor_rnn":
 			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
 			m = LSTM(n_styles*4)(neighbors)
 			m = Dense(n_styles)(m)
@@ -83,10 +83,10 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
-		elif params.experiment == "review_from_all_hidden":
+		elif experiment.name == "review_from_all_hidden_simple_unroll":
 			thinking_width = 10
 
-			neighbors = Input(shape=(experiment.header.meta["neighbor_count"],3,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(experiment.header.meta["neighbor_count"],4,), dtype='float32', name='neighbors')
 			m = Conv1D(thinking_width, 1, activation='tanh')(neighbors)
 			m = MaxPooling1D(experiment.header.meta["neighbor_count"])(m)
 			m = Reshape([thinking_width])(m)
@@ -94,6 +94,26 @@ class Model(object):
 			m = Activation("sigmoid", name='final_activation')(m)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
+
+		elif experiment.name == 'review_from_all_hidden_patch_rnn':
+
+			patch = Input(shape=(12,), dtype='float32')
+
+			transform_layer = Dense(12, activation="tanh")
+
+			# TODO: experiment with manually unrolling here
+			m = transform_layer(patch)
+			m = transform_layer(m)
+			score = Dense(1, activation="tanh")(m)
+			
+			model = keras.models.Model(inputs=[patch], outputs=[score, m])
+
+			model.compile(loss=keras.losses.mean_squared_error,
+				optimizer=keras.optimizers.SGD(lr=0.3),
+				metrics=['accuracy'],
+				target_tensor=[m])
+
+
 
 
 		# Compile time!

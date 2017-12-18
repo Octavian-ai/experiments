@@ -15,6 +15,7 @@ lazy = "*"
 "h5py" = "*"
 colorama = "*"
 coloredlogs = "*"
+more-itertools = "*"
 
 
 [dev-packages]

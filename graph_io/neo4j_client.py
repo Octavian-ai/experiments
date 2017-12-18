@@ -25,6 +25,10 @@ class NodeClient(object):
         for x in self._session.run(cypher.value, **query_params.cypher_query_parameters):
             yield x
 
+    def run(self, cypher: CypherQuery, query_params: QueryParams):
+        # TODO: If you use this for writes then bad things can happen
+        return self._session.run(cypher.value, **query_params.cypher_query_parameters)
+
     def add_to_batch(self, cypher: CypherQuery, query_params: QueryParams):
         if not self.in_flight and not self.batch.empty():
             self.run_batch()

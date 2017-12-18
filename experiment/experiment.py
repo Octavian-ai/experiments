@@ -34,13 +34,15 @@ class Experiment(object):
 
 		if params.verbose > 0:
 			coloredlogs.install(level='INFO')
-		
-		logging.info("Get data")
 
 		dataset = Dataset.get(experiment)
-
 		score = Train.run(experiment, dataset)
 
-		print('Test loss:', score[0])
-		print('Test accuracy:', score[1])
+		print(Fore.YELLOW)
+		print("#######################################################################")
+		print("Experiment results:")
+		print(f"{experiment.name} test loss {score[0]}")
+		print(f"{experiment.name} test accuracy {score[1]}")
+		print("#######################################################################")
+		print(Style.RESET_ALL)
 		
