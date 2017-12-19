@@ -238,12 +238,13 @@ class DatasetHelpers(object):
 		}
 
 		def extract_label(l):
+			print(list(set(l) - set('NODE'))[0])
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
-		def package_node(n,l):
+		def package_node(n, l, hide_score=False):
 			score = n.properties.get("score", -1.0)
 
-			if random.random() < experiment.header.meta["target_dropout"]:
+			if random.random() < experiment.header.meta["target_dropout"] or hide_score:
 				score = -1.0
 
 			label = extract_label(l)
@@ -255,7 +256,7 @@ class DatasetHelpers(object):
 		def t(row):
 			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 20)
 			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"])))
+			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], True)))
 			x = np.concatenate(([h], n))
 
 			return Point(x, row["node"].properties.get("score", -1.0))

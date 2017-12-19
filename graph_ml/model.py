@@ -99,17 +99,20 @@ class Model(object):
 
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
-			patch = Input(shape=(14,21,), dtype='float32')
+			width = 14*21
 
-			transform_layer = Dense(14, activation="tanh")
+			patch = Input(shape=(21,14,), dtype='float32', name="patch")
+
+			flat = Reshape((width,), name="flat")(patch)
+
+			transform_layer = Dense(width, activation="tanh", name="transform")
 
 			# TODO: experiment with manually unrolling here
-			m = transform_layer(patch)
+			m = transform_layer(flat)
+			# m = tf.Print(m, [m, "hiya"])
 			m = transform_layer(m)
-			score = Dense(1, activation="tanh")(m)
+			score = Dense(1, activation="tanh", name="score")(m)
 			
-			tf.Print(m, [m, "hiya"])
-
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
 			model.compile(loss=keras.losses.mean_squared_error,
