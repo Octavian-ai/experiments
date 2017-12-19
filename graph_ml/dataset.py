@@ -65,10 +65,10 @@ class Dataset(object):
 				DatasetHelpers.style_from_neighbor(100)
 			),
 			'review_from_all_hidden_simple_unroll': Recipe(
-				DatasetHelpers.review_from_all_hidden(experiment.header.meta["neighbor_count"])
+				DatasetHelpers.review_from_all_hidden(experiment)
 			),
 			'review_from_all_hidden_patch_rnn': Recipe(
-				DatasetHelpers.review_from_all_hidden_patch_rnn
+				DatasetHelpers.review_from_all_hidden_patch_rnn(experiment)
 			)
 		}
 
@@ -215,8 +215,9 @@ class DatasetHelpers(object):
 
 
 	@classmethod
-	def review_from_all_hidden(cls, length):
+	def review_from_all_hidden(cls, experiment):
 		def t(row):
+			length = experiment.header.meta["neighbor_count"]
 			neighbors = np.array(row["neighbors"])
 			delta = length - neighbors.shape[0]
 
@@ -230,8 +231,14 @@ class DatasetHelpers(object):
 	@staticmethod
 	def review_from_all_hidden_patch_rnn(experiment):
 
+		encode_label = {
+			"PERSON":  [0,1,0,0],
+			"REVIEW":  [0,0,1,0],
+			"PRODUCT": [0,0,0,1]
+		}
+
 		def extract_label(l):
-			return list(l - set('NODE'))[0]
+			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
 		def package_node(n,l):
 			score = n.properties.get("score", -1.0)
@@ -240,16 +247,18 @@ class DatasetHelpers(object):
 				score = -1.0
 
 			label = extract_label(l)
-			return [score,label, np.zero(experiment.header.meta["state"])]
+			return np.concatenate(([score],label, np.zeros(experiment.header.meta["state"])))
 
 		def path_map(i):
 			return package_node(i[0], i[1])
 
 		def t(row):
 			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 20)
-			x = (package_node(row["node"], row["labels(node)"]), n)
+			
+			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"])))
+			x = np.concatenate(([h], n))
 
-			return Point(x, row["node"].properties["score"])
+			return Point(x, row["node"].properties.get("score", -1.0))
 
 		return t
 

@@ -3,6 +3,8 @@ import keras
 from keras.models import Sequential, Model
 from keras.layers import *
 
+import tensorflow as tf
+
 
 # Rainbow sprinkles for your activation function
 # Try to use all activation functions
@@ -97,21 +99,22 @@ class Model(object):
 
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
-			patch = Input(shape=(12,), dtype='float32')
+			patch = Input(shape=(14,21,), dtype='float32')
 
-			transform_layer = Dense(12, activation="tanh")
+			transform_layer = Dense(14, activation="tanh")
 
 			# TODO: experiment with manually unrolling here
 			m = transform_layer(patch)
 			m = transform_layer(m)
 			score = Dense(1, activation="tanh")(m)
 			
-			model = keras.models.Model(inputs=[patch], outputs=[score, m])
+			tf.Print(m, [m, "hiya"])
+
+			model = keras.models.Model(inputs=[patch], outputs=[score])
 
 			model.compile(loss=keras.losses.mean_squared_error,
 				optimizer=keras.optimizers.SGD(lr=0.3),
-				metrics=['accuracy'],
-				target_tensor=[m])
+				metrics=['accuracy'])
 
 
 
