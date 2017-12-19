@@ -173,7 +173,7 @@ directory = {
 				input_product.id,
 				input_person.id
 
-			LIMIT 100
+			LIMIT 100000
 
 		""",
 		float,

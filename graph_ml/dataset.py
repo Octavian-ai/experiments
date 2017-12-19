@@ -8,6 +8,7 @@ import neo4j
 from typing import Callable
 import logging
 import itertools
+from itertools import cycle
 import more_itertools
 
 import keras
@@ -43,36 +44,11 @@ class Recipe:
 
 class Dataset(object):
 
-	@staticmethod
-	def get(experiment):
-		params = experiment.params
-		
-		dataset_file = generate_output_path(experiment, '.pkl')
-		david_has_made_this_work_for_generators = False
-
-		if os.path.isfile(dataset_file) and params.lazy and david_has_made_this_work_for_generators:
-			logging.info(f"Opening dataset pickle {dataset_file}")
-			d = pickle.load(open(dataset_file, "rb"))
-
-		else:
-			logging.info("Querying data from database")
-			d = Dataset.generate(experiment)
-
-			if david_has_made_this_work_for_generators:
-				pickle.dump(d, open(dataset_file, "wb"))
-				logging.info(f"Saved dataset pickle {dataset_file}")
-
-		# logging.info(f"Test data sample: {str(list(zip(d.test.x, d.test.y))[:1])}")
-
-		# if len(d.test.x) == 0 or len(d.train.x) == 0:
-		# 	logging.error("Dataset too small to provide test and training data, this run will fail")
-
-		return d
 
 	# Applies a per-experiment recipe to Neo4j to get a dataset to train on
 	# This performs all transformations in-memory - it is not very efficient
 	@classmethod
-	def generate(cls, experiment):
+	def get(cls, experiment):
 		
 		recipes = {
 			'review_from_visible_style': Recipe(
@@ -114,52 +90,71 @@ class Dataset(object):
 			dataset_name=experiment.header.dataset_name, 
 			experiment=experiment.name)
 
-		with SimpleNodeClient() as client:
+		dataset_file = generate_output_path(experiment, '.pkl')
 
-			def run_query():
-				return client.run(CypherQuery(experiment.header.cypher_query), global_params)
+		if os.path.isfile(dataset_file) and experiment.params.lazy:
+			logging.info(f"Opening dataset pickle {dataset_file}")
+			data = pickle.load(open(dataset_file, "rb"))
 
-			self.statement_result = run_query()
+		else:
+			logging.info("Querying data from database")
+			with SimpleNodeClient() as client:
+				data = client.run(CypherQuery(experiment.header.cypher_query), global_params).data()
+			pickle.dump(data, open(dataset_file, "wb"))
 
-			def generate_all():
-				for i in self.statement_result:
+		# Because we run through the data every epoch, and for test and validate and train
+		# and because we need to know the steps_per_epoch for Keras
+		# the data is in memory for now - sorry brah
 
-					p = recipe.split(i)
-					p.x = recipe.finalize_x(p.x)
+		# But all this downstream is legit generators!
 
-					r = random.random()
-					if r > 0.9:
-						l = "test"
-					elif r > 0.8:
-						l = "validate"
-					else:
-						l = "train"
+		def generate_all():
+			c = 0
+			for i in data:
 
-					yield (l, p)
+				p = recipe.split(i)
+				p.x = recipe.finalize_x(p.x)
+				
+				if c == 9:
+					l = "test"
+				elif c == 8:
+					l = "validate"
+				else:
+					l = "train"
 
-			# It seems like Neo4J cannot tell us number of records to expect
-			# without us fetching them ALL :(
-			total_data = len(run_query().data())
+				c = (c + 1) % 10
 
-			def chunk_train_data():
-				just_trainy = (i[1] for i in self.stream if i[0] == "train")
-				chunky = more_itertools.chunked(just_trainy, experiment.params.batch_size)
+				yield (l, p)
 
-				for i in chunky:
-					xs = np.array([j.x for j in i])
-					ys = np.array([j.y for j in i])
-					yield (xs, ys)
+		# It seems like Neo4J cannot tell us number of records to expect
+		# without us fetching them ALL :(
+		total_data = len(data)
+		logging.info(f"Total number of datum {total_data}")
 
-			self.stream = more_itertools.peekable(generate_all())
-			self.train_generator 		= itertools.cycle(chunk_train_data())
-			self.validation_generator 	= itertools.cycle(((i[1].x, i[1].y) for i in self.stream if i[0] == "validate"))
-			self.test_generator 		= ((i[1].x, i[1].y) for i in self.stream if i[0] == "test")
-			
-			# These are not exact counts since the data is randomly split at generation time
-			self.validation_steps = int(total_data * 0.1)
-			self.steps_per_epoch = int(total_data * 0.8 / experiment.params.batch_size)
+		self.stream = more_itertools.peekable(cycle(generate_all()))
 
-			self.input_shape = (len(self.stream.peek()[0]),)
+		def just(tag):
+			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
+
+		def chunk(it):
+			chunky = more_itertools.chunked(it, experiment.params.batch_size)
+
+			for i in chunky:
+				xs = np.array([j[0] for j in i])
+				ys = np.array([j[1] for j in i])
+				yield (xs, ys)
+
+		
+		self.train_generator 		= chunk(just("train"))
+		self.validation_generator 	= chunk(just("validate"))
+		self.test_generator 		= chunk(just("test"))
+
+		# These are not exact counts since the data is randomly split at generation time
+		self.validation_steps = int(total_data * 0.1)
+		self.test_steps = int(total_data * 0.1)
+		self.steps_per_epoch = int(total_data * 0.8 / experiment.params.batch_size)
+
+		self.input_shape = (len(self.stream.peek()[0]),)
 
 
 class DatasetHelpers(object):

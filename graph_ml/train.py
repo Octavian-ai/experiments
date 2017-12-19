@@ -56,24 +56,36 @@ class Train(object):
 
 		callbacks = [
 			StopEarlyIfAbove(verbose=params.verbose),
-			keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose),
+			keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
 			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/"))
 		]
 		
 		logging.info("Begin training")
 
+		# Once I've worked out Python multithreading conflicts we can introduce workers > 0
 		model.fit_generator(
 			generator=dataset.train_generator,
+			steps_per_epoch=dataset.steps_per_epoch,
 			validation_data=dataset.validation_generator,
 			validation_steps=dataset.validation_steps,
+
 			epochs=params.epochs,
 			verbose=params.verbose,
-			steps_per_epoch=dataset.steps_per_epoch,
+
+			workers=0,
+			use_multiprocessing=False,
 			shuffle=True,
 			callbacks=callbacks
 		)
 
-		score = model.evaluate_generator(dataset.test_generator)
+		logging.info("Evaluate model")
+
+		score = model.evaluate_generator(
+			generator=dataset.test_generator,
+			steps=dataset.test_steps,
+			workers=0,
+			use_multiprocessing=False,
+		)
 
 		if score[1] < 1.0 and params.verbose > 1:
 			for layer in model.layers:
