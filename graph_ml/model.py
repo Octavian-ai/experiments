@@ -5,6 +5,8 @@ from keras.layers import *
 
 import tensorflow as tf
 
+from .cell import *
+
 
 # Rainbow sprinkles for your activation function
 # Try to use all activation functions
@@ -100,19 +102,21 @@ class Model(object):
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
 			width = 14*21
+			ss = experiment.header.meta["sequence_size"]
+			bs = experiment.params.batch_size
 
-			patch = Input(shape=(21,14,), dtype='float32', name="patch")
+			patch = Input(batch_shape=(bs,ss,21,14), dtype='float32', name="patch")
 
-			flat = Reshape((width,), name="flat")(patch)
+			flat = Reshape((width,ss,), name="flat")(patch)
+			# m = Dense(width, activation="tanh", name="transform")(flat)
+						
+			cell = AddressableCell(32)
+			my_rnn = RNN(cell,return_sequences=True,stateful=True)
 
-			transform_layer = Dense(width, activation="tanh", name="transform")
+			m = my_rnn(flat)
+			m = Dense(ss, activation="tanh", name="score")(m)
+			score = Reshape((1,ss,))(m)
 
-			# TODO: experiment with manually unrolling here
-			m = transform_layer(flat)
-			# m = tf.Print(m, [m, "hiya"])
-			m = transform_layer(m)
-			score = Dense(1, activation="tanh", name="score")(m)
-			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
 			model.compile(loss=keras.losses.mean_squared_error,

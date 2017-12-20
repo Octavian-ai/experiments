@@ -199,7 +199,8 @@ directory = {
 		{
 			"target_dropout": 0.1,
 			"state": 8,
-			"generator": True
+			"generator": True,
+			"sequence_size": 20
 		}
 	),
 

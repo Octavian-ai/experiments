@@ -136,18 +136,23 @@ class Dataset(object):
 		def just(tag):
 			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
 
-		def chunk(it):
-			chunky = more_itertools.chunked(it, experiment.params.batch_size)
-
+		def chunk(it, length):
+			chunky = more_itertools.chunked(it, length)
 			for i in chunky:
-				xs = np.array([j[0] for j in i])
-				ys = np.array([j[1] for j in i])
-				yield (xs, ys)
+					xs = np.array([j[0] for j in i])
+					ys = np.array([j[1] for j in i])
+					yield (xs, ys)
 
 		
-		self.train_generator 		= chunk(just("train"))
-		self.validation_generator 	= chunk(just("validate"))
-		self.test_generator 		= chunk(just("test"))
+		bs = experiment.params.batch_size
+		ss = experiment.header.meta["sequence_size"]
+
+		def chunk_chunk(it):
+			return chunk(chunk(it, ss), bs)
+
+		self.train_generator 		= chunk_chunk(just("train"))
+		self.validation_generator 	= chunk_chunk(just("validate"))
+		self.test_generator 		= chunk_chunk(just("test"))
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps = int(total_data * 0.1)
@@ -238,7 +243,6 @@ class DatasetHelpers(object):
 		}
 
 		def extract_label(l):
-			print(list(set(l) - set('NODE'))[0])
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
 		def package_node(n, l, hide_score=False):
