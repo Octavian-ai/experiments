@@ -143,6 +143,17 @@ class Dataset(object):
 					ys = np.array([j[1] for j in i])
 					yield (xs, ys)
 
+		def chunk_key(it, length, keys):
+			chunky = more_itertools.chunked(it, length)
+
+			def c(k):
+				for i in chunky:
+					xs = np.array([j[0][k] for j in i])
+					ys = np.array([j[1] for j in i])
+					yield (xs, ys)
+
+			return {k: c(k) for k in keys}
+
 		
 		bs = experiment.params.batch_size
 		ss = experiment.header.meta["sequence_size"]
@@ -150,9 +161,14 @@ class Dataset(object):
 		def chunk_chunk(it):
 			return chunk(chunk(it, ss), bs)
 
-		self.train_generator 		= chunk_chunk(just("train"))
-		self.validation_generator 	= chunk_chunk(just("validate"))
-		self.test_generator 		= chunk_chunk(just("test"))
+		def chunk_chunk_key(it, key):
+			return chunk_key(chunk_key(it, ss, key), bs, key)
+
+		keys = ["neighbor", "node"]
+
+		self.train_generator 		= chunk_chunk_key(just("train"), keys)
+		self.validation_generator 	= chunk_chunk_key(just("validate"), keys)
+		self.test_generator 		= chunk_chunk_key(just("test"), keys)
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps = int(total_data * 0.1)
@@ -252,16 +268,16 @@ class DatasetHelpers(object):
 				score = -1.0
 
 			label = extract_label(l)
-			return np.concatenate(([score],label, np.zeros(experiment.header.meta["state"])))
+			return np.concatenate(([score],label))
 
 		def path_map(i):
 			return package_node(i[0], i[1])
 
 		def t(row):
-			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 20)
+			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.meta["neighbor_count"])
 			
 			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], True)))
-			x = np.concatenate(([h], n))
+			x = {'node':[h], 'neighbors':n}
 
 			return Point(x, row["node"].properties.get("score", -1.0))
 

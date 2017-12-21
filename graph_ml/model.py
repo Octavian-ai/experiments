@@ -88,6 +88,7 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
+
 		elif experiment.name == "review_from_all_hidden_simple_unroll":
 			thinking_width = 10
 
@@ -100,32 +101,55 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
+
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
-			width = 14*21
+			
+			# ---------------------------------------------
+			# I need to refactor all this into my cell so that 
+			# it can process streams of patches
+			# ---------------------------------------------
 			ss = experiment.header.meta["sequence_size"]
+			nc = experiment.header.meta["neighbor_count"]
 			bs = experiment.params.batch_size
+			width = 5
+			node_control_width = 10
+			address_width = 10
+			word_size = 8
 
-			patch = Input(batch_shape=(bs,ss,21,14), dtype='float32', name="patch")
-			print(f"patch {patch}")
+			node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
+			neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
 
-			flat = Reshape((ss,width), name="flatten_patch")(patch)
-			# m = Dense(width, activation="tanh", name="transform")(flat)
+
+			m = Conv1D(node_control_width, 1, activation='tanh')(neighbors)
+			m = MaxPooling1D(nc)(m)
+			m = Reshape([node_control_width])(m)
+
+			n = Dense(node_control_width)(node)
+
+			all_control = Concatenate()([m,n])
+
+			address = Dense(address_width)(all_control)
+			write = Dense(word_size)(all_control)
+			erase = Dense(word_size)(all_control)
+
+			# Nodes store one-hot encoding of their memory location
+			# address is relative to the nodes in this patch
+			# Take address and transpose it, then multiply that by the
+			# N x M matrix of this patches one-hot node locations
+
+			address_resolved = NodeAddressor()(address, node, neighbors)
 						
-			cell = AddressableCell(32)
-			my_rnn = RNN(cell,return_sequences=True,stateful=True)
+			cell = AddressableCell(word_size, address_width)
+			rnn = RNN(cell,return_sequences=True,stateful=True)
 
-			m = my_rnn(flat)
-			print(f"post my_rnn {m}")
-			m = Dense(1, activation="tanh", name="score_dense")(m)
-			print(f"post score_dense {m}")
-			# m = Reshape((ss,1), name="score_reshape")(m)
-			
-			m = Lambda(lambda x: K.squeeze(x, -1))(m)
-			print(f"post lambda {m}")
-			
+			rnn_out = rnn((address_resolved,write,erase))
 
-			score = m
+			all_out = Concatenate()([all_control,rnn_out])
+
+			score = Dense(1, activation="tanh", name="score_dense")(all_out)
+			score = Lambda(lambda x: K.squeeze(x, -1))(score)
+			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
 			model.compile(loss=keras.losses.mean_squared_error,
