@@ -228,6 +228,6 @@ directory = {
 
 }
 
-default_experiment = "style_from_neighbor_rnn"
+default_experiment = "review_from_all_hidden_patch_rnn"
 
 

@@ -2,6 +2,7 @@
 import keras
 from keras.models import Sequential, Model
 from keras.layers import *
+import keras.backend as K
 
 import tensorflow as tf
 
@@ -106,17 +107,25 @@ class Model(object):
 			bs = experiment.params.batch_size
 
 			patch = Input(batch_shape=(bs,ss,21,14), dtype='float32', name="patch")
+			print(f"patch {patch}")
 
-			flat = Reshape((width,ss,), name="flat")(patch)
+			flat = Reshape((ss,width), name="flatten_patch")(patch)
 			# m = Dense(width, activation="tanh", name="transform")(flat)
 						
 			cell = AddressableCell(32)
 			my_rnn = RNN(cell,return_sequences=True,stateful=True)
 
 			m = my_rnn(flat)
-			m = Dense(ss, activation="tanh", name="score")(m)
-			score = Reshape((1,ss,))(m)
+			print(f"post my_rnn {m}")
+			m = Dense(1, activation="tanh", name="score_dense")(m)
+			print(f"post score_dense {m}")
+			# m = Reshape((ss,1), name="score_reshape")(m)
+			
+			m = Lambda(lambda x: K.squeeze(x, -1))(m)
+			print(f"post lambda {m}")
+			
 
+			score = m
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
 			model.compile(loss=keras.losses.mean_squared_error,
