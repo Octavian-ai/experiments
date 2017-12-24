@@ -10,7 +10,7 @@ class Arguments(object):
 
 		parser.add_argument('--experiment', type=str, default=default_experiment, choices=directory.keys())
 
-		parser.add_argument('--batch_size', type=int, default=16)
+		parser.add_argument('--batch_size', type=int, default=32)
 		parser.add_argument('--epochs', type=int, default=20)
 		parser.add_argument('--random-seed', type=int, default=None)
 		parser.add_argument('--verbose', type=int, default=1)

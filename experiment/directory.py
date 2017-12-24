@@ -198,10 +198,13 @@ directory = {
 		"Special",
 		{
 			"target_dropout": 0.1,
-			"state": 8,
 			"generator": True,
 			"sequence_size": 20,
-			"neighbor_count": 20
+			"memory_size": 100,
+			"word_size": 20,
+			"patch_size": 21,
+			"patch_width": 6,
+			"node_control_width": 10
 		}
 	),
 

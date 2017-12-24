@@ -10,6 +10,7 @@ import logging
 import itertools
 from itertools import cycle
 import more_itertools
+from more_itertools import peekable
 
 import keras
 import numpy as np
@@ -33,7 +34,10 @@ class Point(object):
 		self.y.append(point.y)
 
 	def __str__(self):
-		return "{x: " + str(self.x) + ",\ny: " + str(self.y) + "}"
+		return "{x:\n" + str(self.x) + ",\ny:\n" + str(self.y) + "}"
+
+	def __repr__(self):
+		return self.__str__()
 
 
 class Recipe:
@@ -131,7 +135,7 @@ class Dataset(object):
 		total_data = len(data)
 		logging.info(f"Total number of datum {total_data}")
 
-		self.stream = more_itertools.peekable(cycle(generate_all()))
+		self.stream = peekable(cycle(generate_all()))
 
 		def just(tag):
 			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
@@ -158,7 +162,7 @@ class Dataset(object):
 		bs = experiment.params.batch_size
 		ss = experiment.header.meta["sequence_size"]
 
-		def chunk_chunk(it):
+		def chunk_chunk(it, keys=None):
 			return chunk(chunk(it, ss), bs)
 
 		def chunk_chunk_key(it, key):
@@ -166,9 +170,12 @@ class Dataset(object):
 
 		keys = ["neighbor", "node"]
 
-		self.train_generator 		= chunk_chunk_key(just("train"), keys)
-		self.validation_generator 	= chunk_chunk_key(just("validate"), keys)
-		self.test_generator 		= chunk_chunk_key(just("test"), keys)
+		self.train_generator 		= peekable(chunk_chunk(just("train"), keys))
+		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
+		self.test_generator 		= chunk_chunk(just("test"), keys)
+
+		logging.info(f"First training item: {self.train_generator.peek()}")
+
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps = int(total_data * 0.1)
@@ -274,10 +281,10 @@ class DatasetHelpers(object):
 			return package_node(i[0], i[1])
 
 		def t(row):
-			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.meta["neighbor_count"])
+			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.meta["patch_size"]-1)
 			
 			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], True)))
-			x = {'node':[h], 'neighbors':n}
+			x = np.concatenate([[h], n])
 
 			return Point(x, row["node"].properties.get("score", -1.0))
 

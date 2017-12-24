@@ -16,6 +16,8 @@ lazy = "*"
 colorama = "*"
 coloredlogs = "*"
 more-itertools = "*"
+recurrentshop = {git = "https://github.com/datalogai/recurrentshop.git"}
+colored-traceback = "*"
 
 
 [dev-packages]

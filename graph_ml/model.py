@@ -110,44 +110,22 @@ class Model(object):
 			# it can process streams of patches
 			# ---------------------------------------------
 			ss = experiment.header.meta["sequence_size"]
-			nc = experiment.header.meta["neighbor_count"]
+			ps = experiment.header.meta["patch_size"]
 			bs = experiment.params.batch_size
+
+			# Move into header.meta
 			width = 5
 			node_control_width = 10
-			address_width = 10
-			word_size = 8
 
-			node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
-			neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
+			# node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
+			# neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
+			patch = Input(batch_shape=(bs,ss,ps,width), dtype='float32', name="patch")
 
+			# TODO: get rid of this req
+			
+			rnn_out = PatchRNN(experiment)(patch)
 
-			m = Conv1D(node_control_width, 1, activation='tanh')(neighbors)
-			m = MaxPooling1D(nc)(m)
-			m = Reshape([node_control_width])(m)
-
-			n = Dense(node_control_width)(node)
-
-			all_control = Concatenate()([m,n])
-
-			address = Dense(address_width)(all_control)
-			write = Dense(word_size)(all_control)
-			erase = Dense(word_size)(all_control)
-
-			# Nodes store one-hot encoding of their memory location
-			# address is relative to the nodes in this patch
-			# Take address and transpose it, then multiply that by the
-			# N x M matrix of this patches one-hot node locations
-
-			address_resolved = NodeAddressor()(address, node, neighbors)
-						
-			cell = AddressableCell(word_size, address_width)
-			rnn = RNN(cell,return_sequences=True,stateful=True)
-
-			rnn_out = rnn((address_resolved,write,erase))
-
-			all_out = Concatenate()([all_control,rnn_out])
-
-			score = Dense(1, activation="tanh", name="score_dense")(all_out)
+			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)
 			score = Lambda(lambda x: K.squeeze(x, -1))(score)
 			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
