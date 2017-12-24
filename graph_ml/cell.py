@@ -12,33 +12,62 @@ class PatchCell(RNNCell):
 	def __init__(self, experiment, **kwargs):
 		self.experiment = experiment
 		self.word_size = self.experiment.header.meta["word_size"]
+		self.batch_size = self.experiment.params.batch_size
+		self.memory_size = self.experiment.header.meta["memory_size"]
+
+		self.word_shape = [self.word_size]
+		self.word_shape_batch = [self.batch_size, self.word_size]
+		self.memory_shape = [self.memory_size, self.word_size]
+		self.memory_shape_batch = [self.batch_size] + self.memory_shape
+
 		super(PatchCell, self).__init__(**kwargs)
 
+	def expand_word_mask(self, address, mask):
+		# if len(mask.shape) == 2:
+		mask = K.expand_dims(mask,1)
+		address = K.expand_dims(address, -1)
+
+		mask = K.batch_dot(address, mask)
+		assert mask.shape == self.memory_shape_batch, (f"Mask is not memory shaped {mask.shape}")
+		return mask
 
 	def read(self, memory, address):
-		masked = K.batch_dot(memory, address)
-		row = K.sum(masked, axis=-1)
-		return row
+		address_expanded = K.repeat_elements(K.expand_dims(address, -1), self.word_size, -1)
+		read_e = memory * address_expanded
+		return K.sum(read_e, axis=1)
 
 	def write(self, memory, address, write):
-		return memory + K.dot(address, write)
+		write_e = self.expand_word_mask(address, write)
+		return memory + write_e
 
 	def erase(self, memory, address, erase):
-		erase = K.expand_dims(erase,1)
-		erase_expand = K.batch_dot(address, erase)
-		erase_block = (K.ones((self.batch_size, self.memory_size, self.word_size)) - erase_expand)
-		memory_out = K.dot(memory, erase_block)
+		erase_e = self.expand_word_mask(address, erase)
+
+		# I need to make this 
+		# self.memory_ones = self.add_weight(shape=self.memory_shape_batch,
+		# 	initializer='ones',
+		# 	name='memory_ones')
+
+		# memory_ones = K.zeros(self.memory_shape_batch) #  Initializer for variable recurrent_model_1/while/model_1/lambda_3/Variable/ is from inside a control-flow construct, such as a loop or conditional. When creating a variable inside a loop or conditional, use a lambda as the initializer.
+		memory_ones = K.constant(0, shape=self.memory_shape_batch)
+
+		# memory_ones = tf.get_variable("memory_ones", shape=self.memory_shape_batch, initializer=tf.constant_inititializer(0))
+
+		memory_out = memory * (memory_ones - erase_e)
 		return memory_out
 
 	def memory_op(self, memory, address, write, erase):
-		address_expanded = K.repeat_elements(K.expand_dims(address, 1), self.word_size, 1)
 
-		read_layer = Lambda(lambda x: K.sum(K.batch_dot(memory, x), axis=-1))
+		# Python lacks currying
+		read_layer  = Lambda(lambda x:  self.read(x, address), output_shape=self.word_shape)
+		write_layer = Lambda(lambda x: self.write(x, address, write), output_shape=self.memory_shape)
+		erase_layer = Lambda(lambda x: self.erase(x, address, erase), output_shape=self.memory_shape)
 
-		# output = self.read(memory, address_expanded)
-		output = read_layer(address_expanded)
-		# memory = self.erase(memory, address, erase)
-		# memory = self.write(memory, address, write)
+		output = read_layer(memory)
+		memory = write_layer(memory)
+		memory = erase_layer(memory)
+
+		assert output.shape == (self.word_shape_batch), f"Output is not a memory word {output.shape}"
 
 		return output, memory
 

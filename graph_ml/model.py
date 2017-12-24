@@ -118,7 +118,10 @@ class Model(object):
 			rnn_out = PatchRNN(experiment)(patch)
 
 			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)
-			score = Lambda(lambda x: K.squeeze(x, -1))(score)
+			print("score",score)
+			# score = Lambda(lambda x: K.expand_dims(x, axis=-1), name="score_reshape")(score)
+
+			# assert score.shape == [bs, ss, 1], f"Score wrong shape, {score.shape}"
 			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 

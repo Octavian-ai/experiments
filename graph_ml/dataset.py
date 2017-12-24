@@ -174,8 +174,7 @@ class Dataset(object):
 		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
 		self.test_generator 		= chunk_chunk(just("test"), keys)
 
-		logging.info(f"First training item: {self.train_generator.peek()}")
-
+		# logging.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps = int(total_data * 0.1)
@@ -288,7 +287,7 @@ class DatasetHelpers(object):
 
 			assert x.shape == (experiment.header.meta["patch_size"], experiment.header.meta["patch_width"])
 
-			return Point(x, row["node"].properties.get("score", -1.0))
+			return Point(x, [row["node"].properties.get("score", -1.0)])
 
 		return t
 
