@@ -204,7 +204,8 @@ directory = {
 			"word_size": 20,
 			"patch_size": 21,
 			"patch_width": 6,
-			"node_control_width": 10
+			"node_control_width": 10,
+			"epochs": 100
 		}
 	),
 

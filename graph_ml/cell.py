@@ -98,7 +98,7 @@ class PatchRNN(object):
 		patch_width = self.experiment.header.meta["patch_width"]
 		cell = PatchCell(self.experiment, output_dim=patch_width, input_shape=(patch_size, patch_width))
 		# get_layer accepts arguments like return_sequences, unroll etc :
-		return cell.get_layer(return_sequences=True, unroll=True)(layer_in)
+		return cell.get_layer(return_sequences=True)(layer_in)
 
 
 class NodeAddressor(object):

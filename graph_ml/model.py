@@ -104,22 +104,14 @@ class Model(object):
 
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
-			
-			# ---------------------------------------------
-			# I need to refactor all this into my cell so that 
-			# it can process streams of patches
-			# ---------------------------------------------
 			ss = experiment.header.meta["sequence_size"]
 			ps = experiment.header.meta["patch_size"]
+			pw = experiment.header.meta["patch_width"]
 			bs = experiment.params.batch_size
-
-			# Move into header.meta
-			width = 5
-			node_control_width = 10
 
 			# node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
 			# neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
-			patch = Input(batch_shape=(bs,ss,ps,width), dtype='float32', name="patch")
+			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
 
 			# TODO: get rid of this req
 			

@@ -62,6 +62,13 @@ class Train(object):
 		
 		logging.info("Begin training")
 
+		# TODO: move to more general overriding mechanism
+		# Perhaps unify os.environ, arguments, experiment parameters
+		if params.epochs is not None:
+			epochs = params.epochs
+		else:
+			epochs = experiment.header.meta.get('epochs', 20)
+
 		# Once I've worked out Python multithreading conflicts we can introduce workers > 0
 		model.fit_generator(
 			generator=dataset.train_generator,
@@ -69,7 +76,7 @@ class Train(object):
 			validation_data=dataset.validation_generator,
 			validation_steps=dataset.validation_steps,
 
-			epochs=params.epochs,
+			epochs=epochs,
 			verbose=params.verbose,
 
 			workers=0,

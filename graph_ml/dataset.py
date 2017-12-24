@@ -286,6 +286,8 @@ class DatasetHelpers(object):
 			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], True)))
 			x = np.concatenate([[h], n])
 
+			assert x.shape == (experiment.header.meta["patch_size"], experiment.header.meta["patch_width"])
+
 			return Point(x, row["node"].properties.get("score", -1.0))
 
 		return t
