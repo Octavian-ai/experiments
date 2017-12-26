@@ -42,7 +42,7 @@ class PatchBase(object):
 		extract_width = self.patch_width - (slice_begin % self.patch_width)
 
 		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), extract_width, -1))(address)
-		patch_slices = Lambda(lambda x: x[:,:,slice_begin::],name="PatchAddressBlock")(patch)
+		patch_slices = Lambda(lambda x: x[:,:,slice_begin::])(patch)
 		assert_shape(patch_slices, [self.patch_size, extract_width])
 
 		rows = multiply([patch_slices, address_repeated])
@@ -98,24 +98,29 @@ class PatchSimple(PatchBase):
 		memory_t = memory_tm1
 
 		v = self.combine_nodes(patch, 5)
-		address_ptr = Dense(self.patch_size)(v)
-		# address = self.resolve_address(address_ptr, patch)
 		
 		# # Memory operations
 
+		# address_erase_ptr = Dense(self.patch_size)(v)
+		# address_erase = self.resolve_address(address_erase_ptr, patch)
 		# erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
-		# memory_t = self.erase(memory_t, address, erase_word)
-
+		# memory_t = self.erase(memory_t, address_erase, erase_word)
+	
+		# address_write_ptr = Dense(self.patch_size)(v)
+		# address_write = self.resolve_address(address_write_ptr, patch)
 		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
-		# memory_t = self.write(memory_t, address, write_word)
+		# memory_t = self.write(memory_t, address_write, write_word)
 
 		# # Read after so it can loopback in a single step if it wants
-		# read = self.read(memory_t, address)
+		address_read_ptr = Dense(self.patch_size)(v)
+		address_read = self.resolve_address(address_read_ptr, patch)
+		read = self.read(memory_t, address_read)
 
-		read = self.patch_extract(address_ptr, patch, 0)
+		# read = self.patch_extract(address_read_ptr, patch, 0)
 		
-		# v = Concatenate()([v, read])
-		out = Dense(5)(read)
+		out = Dense(5)(v)
+		# out = Concatenate()([v, read])
+		# out = Dense(5)(read)
 
 		return RecurrentModel(
 			input=patch,

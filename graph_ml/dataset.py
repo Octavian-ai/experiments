@@ -285,7 +285,7 @@ class DatasetHelpers(object):
 			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
 
-			logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
+			# logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
 
 			label = extract_label(l)
 			score = n.properties.get("score", -1.0)
