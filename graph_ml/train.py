@@ -67,7 +67,7 @@ class Train(object):
 		if params.epochs is not None:
 			epochs = params.epochs
 		else:
-			epochs = experiment.header.meta.get('epochs', 20)
+			epochs = experiment.header.params.get('epochs', 20)
 
 		# Once I've worked out Python multithreading conflicts we can introduce workers > 0
 		model.fit_generator(
@@ -94,9 +94,9 @@ class Train(object):
 			use_multiprocessing=False,
 		)
 
-		if score[1] < 1.0 and params.verbose > 1:
+		if params.verbose > 1: # and score[1] < 1.0
 			for layer in model.layers:
-				print("Layer weights", layer.get_weights())
+				print(f"Layer {layer.name} {layer.get_weights()}")
 
 		return score
 

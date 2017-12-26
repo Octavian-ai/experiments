@@ -92,9 +92,9 @@ class Model(object):
 		elif experiment.name == "review_from_all_hidden_simple_unroll":
 			thinking_width = 10
 
-			neighbors = Input(shape=(experiment.header.meta["neighbor_count"],4,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(experiment.header.params["neighbor_count"],4,), dtype='float32', name='neighbors')
 			m = Conv1D(thinking_width, 1, activation='tanh')(neighbors)
-			m = MaxPooling1D(experiment.header.meta["neighbor_count"])(m)
+			m = MaxPooling1D(experiment.header.params["neighbor_count"])(m)
 			m = Reshape([thinking_width])(m)
 			m = Dense(1)(m)
 			m = Activation("sigmoid", name='final_activation')(m)
@@ -104,9 +104,9 @@ class Model(object):
 
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
-			ss = experiment.header.meta["sequence_size"]
-			ps = experiment.header.meta["patch_size"]
-			pw = experiment.header.meta["patch_width"]
+			ss = experiment.header.params["sequence_size"]
+			ps = experiment.header.params["patch_size"]
+			pw = experiment.header.params["patch_width"]
 			bs = experiment.params.batch_size
 
 			# https://stackoverflow.com/questions/42969779/keras-error-you-must-feed-a-value-for-placeholder-tensor-bidirectional-1-keras

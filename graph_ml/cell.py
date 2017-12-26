@@ -13,12 +13,12 @@ class PatchBase(object):
 	def __init__(self, experiment):
 		self.experiment = experiment
 
-		self.patch_size  = experiment.header.meta["patch_size"]
-		self.patch_width = experiment.header.meta["patch_width"]
+		self.patch_size  = experiment.header.params["patch_size"]
+		self.patch_width = experiment.header.params["patch_width"]
 
-		self.word_size = self.experiment.header.meta["word_size"]
+		self.word_size = self.experiment.header.params["word_size"]
 		self.batch_size = self.experiment.params.batch_size
-		self.memory_size = self.experiment.header.meta["memory_size"]
+		self.memory_size = self.experiment.header.params["memory_size"]
 
 		self.word_shape = [self.word_size]
 		self.word_shape_batch = [self.batch_size, self.word_size]
@@ -47,7 +47,7 @@ class PatchBase(object):
 
 		rows = multiply([patch_slices, address_repeated])
 		row = Lambda(lambda x: K.sum(x,-2))(rows)
-		assert_shape(address_resolved, [extract_width])
+		assert_shape(row, [extract_width])
 
 		return row 
 
@@ -57,10 +57,17 @@ class PatchBase(object):
 	def read(self, memory, address):
 		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), self.word_size, -1))(address)
 		read_rows = multiply([memory, address_repeated])
-		read = Lambda(lambda x: K.sum(x,-1))(read_rows)
+		read = Lambda(lambda x: K.sum(x,-2))(read_rows)
+
+		assert_shape(read, [self.word_size])
+
 		return read
 
 	def write(self, memory, address, write):
+		assert_shape(memory, self.memory_shape)
+		assert_shape(write, [self.word_size])
+		assert_shape(address, [self.memory_size])
+
 		address_expanded = expand_dims(address, -1)
 		write = expand_dims(write, 1)
 		write_e = dot([address_expanded, write], axes=[2,1], name="WriteExpanded")
@@ -75,7 +82,6 @@ class PatchBase(object):
 		erase_mask = Lambda(lambda x: 1.0 - x)(erase_e)
 		memory = multiply([memory, erase_mask])
 		return memory
-
 
 class PatchSimple(PatchBase):
 
@@ -131,11 +137,11 @@ class PatchRNN(PatchBase):
 
 	def __call__(self, patch_in):
 		batch_size  = self.experiment.params.batch_size
-		patch_size  = self.experiment.header.meta["patch_size"]
-		patch_width = self.experiment.header.meta["patch_width"]
-		memory_size = self.experiment.header.meta["memory_size"]
-		word_size   = self.experiment.header.meta["word_size"]
-		node_control_width = self.experiment.header.meta["node_control_width"]
+		patch_size  = self.experiment.header.params["patch_size"]
+		patch_width = self.experiment.header.params["patch_width"]
+		memory_size = self.experiment.header.params["memory_size"]
+		word_size   = self.experiment.header.params["word_size"]
+		node_control_width = self.experiment.header.params["node_control_width"]
 
 		# patch = Input(batch_shape=(batch_size, patch_size, patch_width), name="InputPatch")
 		# memory_in = Input(batch_shape=(batch_size, memory_size, word_size), name="InputMemory")
@@ -183,8 +189,8 @@ class PatchRNN(PatchBase):
 # 		self.experiment = experiment
 
 # 	def __call__(self, layer_in):
-# 		patch_size  = self.experiment.header.meta["patch_size"]
-# 		patch_width = self.experiment.header.meta["patch_width"]
+# 		patch_size  = self.experiment.header.params["patch_size"]
+# 		patch_width = self.experiment.header.params["patch_width"]
 # 		cell = PatchCell(self.experiment, output_dim=patch_width, input_shape=(patch_size, patch_width))
 # 		# get_layer accepts arguments like return_sequences, unroll etc :
 # 		return cell.get_layer(return_sequences=True)(layer_in)

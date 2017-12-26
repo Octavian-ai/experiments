@@ -15,8 +15,8 @@ class AddressableCell(keras.layers.Layer):
 	# TODO: share memory across batch
 	def __init__(self, experiment, **kwargs):
 		self.batch_size = experiment.params.batch_size
-		self.memory_size = experiment.header.meta["memory_size"]
-		self.word_size = experiment.header.meta["word_size"]
+		self.memory_size = experiment.header.params["memory_size"]
+		self.word_size = experiment.header.params["word_size"]
 		self.state_size = (self.memory_size * self.word_size)
 
 		super(AddressableCell, self).__init__(**kwargs)

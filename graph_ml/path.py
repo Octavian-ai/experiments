@@ -1,5 +1,4 @@
 
-import experiment
 import hashlib
 import os.path
 

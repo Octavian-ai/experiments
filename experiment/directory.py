@@ -1,19 +1,9 @@
 from data_sets.synthetic_review_prediction import EXPERIMENT_1_DATASET, \
 	EXPERIMENT_2_DATASET, EXPERIMENT_3_DATASET, EXPERIMENT_4_DATASET
-from graph_io.classes import DatasetName
 
 from basic_types import NanoType
 
-
-class ExperimentHeader(object):
-	def __init__(self, doc, dataset_name: DatasetName, cypher_query, target, meta={}):
-		# Jesus I have to spell this out?!
-		# WTF are the python language devs doing?!
-		self.dataset_name = dataset_name
-		self.doc = doc
-		self.cypher_query = cypher_query
-		self.target = target
-		self.meta = meta
+from .experiment_header import ExperimentHeader
 
 shared_query = {
 	"product_and_product_subgraph": """

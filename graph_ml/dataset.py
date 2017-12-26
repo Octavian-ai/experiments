@@ -17,7 +17,6 @@ import numpy as np
 from keras.preprocessing import text
 from keras.utils import np_utils
 
-import experiment
 from .path import generate_output_path
 from graph_io import *
 
@@ -160,7 +159,7 @@ class Dataset(object):
 
 		
 		bs = experiment.params.batch_size
-		ss = experiment.header.meta["sequence_size"]
+		ss = experiment.header.params["sequence_size"]
 
 		def chunk_chunk(it, keys=None):
 			return chunk(chunk(it, ss), bs)
@@ -244,7 +243,7 @@ class DatasetHelpers(object):
 	@classmethod
 	def review_from_all_hidden(cls, experiment):
 		def t(row):
-			length = experiment.header.meta["neighbor_count"]
+			length = experiment.header.params["neighbor_count"]
 			neighbors = np.array(row["neighbors"])
 			delta = length - neighbors.shape[0]
 
@@ -272,21 +271,20 @@ class DatasetHelpers(object):
 		def node_id_to_memory_addr(nid):
 
 			if nid not in node_id_dict:
-				node_id_dict[nid] = len(node_id_dict) % experiment.header.meta['memory_size']
+				node_id_dict[nid] = len(node_id_dict) % experiment.header.params['memory_size']
 
 			return node_id_dict[nid]
 
 		def package_node(n, l, is_head=0.0, hide_score=False):
-			ms = experiment.header.meta['memory_size']
+			ms = experiment.header.params['memory_size']
 
-			# if random.random() < experiment.header.meta["target_dropout"] or hide_score:
+			# if random.random() < experiment.header.params["target_dropout"] or hide_score:
 			# 	score = -1.0
 
 			address_trunc = node_id_to_memory_addr(n.id)
 			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
 
-			# print("Address: ",address_trunc, n.id, address_one_hot)
 			logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
 
 			label = extract_label(l)
@@ -299,17 +297,17 @@ class DatasetHelpers(object):
 
 		def t(row):
 
-			if experiment.header.meta["patch_size"] > 1:
-				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.meta["patch_size"]-1)
+			if experiment.header.params["patch_size"] > 1:
+				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.params["patch_size"]-1)
 			
 			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
 
-			if experiment.header.meta["patch_size"] > 1:
+			if experiment.header.params["patch_size"] > 1:
 				x = np.concatenate([[h], n])
 			else:
 				x = np.array([h])
 
-			assert x.shape == (experiment.header.meta["patch_size"], experiment.header.meta["patch_width"])
+			assert x.shape == (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
 
 			return Point(x, [row["node"].properties.get("score", -1.0)])
 
