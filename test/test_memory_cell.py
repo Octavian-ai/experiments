@@ -56,6 +56,6 @@ class Tests(TestCase):
 					assert_almost_equal(memory_final[i][j], 0)
 
 
-		assert_allclose(read_final, write_d[0])
+		assert_allclose(read_final, write_d)
 
 
