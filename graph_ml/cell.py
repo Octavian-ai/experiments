@@ -47,7 +47,7 @@ class PatchBase(object):
 
 		rows = multiply([patch_slices, address_repeated])
 		row = Lambda(lambda x: K.sum(x,-2))(rows)
-		# assert_shape(address_resolved, [self.memory_size])
+		assert_shape(address_resolved, [extract_width])
 
 		return row 
 
@@ -96,11 +96,12 @@ class PatchSimple(PatchBase):
 		# address = self.resolve_address(address_ptr, patch)
 		
 		# # Memory operations
-		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
-		# memory_t = self.write(memory_t, address, write_word)
 
 		# erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
 		# memory_t = self.erase(memory_t, address, erase_word)
+
+		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
+		# memory_t = self.write(memory_t, address, write_word)
 
 		# # Read after so it can loopback in a single step if it wants
 		# read = self.read(memory_t, address)
