@@ -79,6 +79,42 @@ class Tests(TestCase):
 
 
 	@keras_test
+	def test_memory_loopback(self):
+	    
+		memory_size = 10
+		word_size = 4
+		batch_size = 1
+
+		header = ExperimentHeader(params={"word_size":word_size, "memory_size":memory_size, "patch_size":4, "patch_width":4})
+		experiment = Experiment("test_memory_cell", header, Args(batch_size))
+
+		# Initialise memory with zeros
+		memory_initial = np.random.random((batch_size, memory_size, word_size))
+		memory_tm1 = K.constant(memory_initial, name="memory",dtype=float32)
+		memory_t = memory_tm1
+
+		# Write address is random int
+		address = random.randint(0,memory_size - 1)
+		address_one_hot = np.zeros([batch_size, memory_size])
+		address_one_hot[0][address] = 1.0
+		t_address = K.constant(address_one_hot, name="address",dtype=float32)
+
+		# Write random pattern
+		write = np.random.random([batch_size, word_size])
+		t_write = K.constant(write, name="write")
+		t_erase = K.constant(np.ones([batch_size, word_size]),name="erase")
+
+		pb = PatchBase(experiment)
+		memory_t = pb.erase(memory_t, t_address, t_erase)
+		memory_t = pb.write(memory_t, t_address, t_write)
+		t_read   = pb.read( memory_t, t_address)
+
+		read_final = K.eval(t_read)
+
+		assert_allclose(read_final, write)
+
+
+	@keras_test
 	def test_address_resolution(self):
 
 		# Data setup
