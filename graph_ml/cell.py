@@ -38,16 +38,21 @@ class PatchBase(object):
 		n = Reshape([width])(n)
 		return n
 
+	def patch_extract(self, address, patch, slice_begin):
+		extract_width = self.patch_width - (slice_begin % self.patch_width)
+
+		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), extract_width, -1))(address)
+		patch_slices = Lambda(lambda x: x[:,:,slice_begin::],name="PatchAddressBlock")(patch)
+		assert_shape(patch_slices, [self.patch_size, extract_width])
+
+		rows = multiply([patch_slices, address_repeated])
+		row = Lambda(lambda x: K.sum(x,-2))(rows)
+		# assert_shape(address_resolved, [self.memory_size])
+
+		return row 
+
 	def resolve_address(self, address, patch):
-		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), self.memory_size, -1))(address)
-		patch_addresses = Lambda(lambda x: x[:,:,-self.memory_size::],name="PatchAddressBlock")(patch)
-		assert_shape(patch_addresses, (self.patch_size, self.memory_size))
-
-		address_rows = multiply([patch_addresses, address_repeated])
-		address_resolved = Lambda(lambda x: K.sum(x,-2))(address_rows)
-		assert_shape(address_resolved, [self.memory_size])
-
-		return address_resolved 
+		return self.patch_extract(address, patch, -self.memory_size) 
 
 	def read(self, memory, address):
 		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), self.word_size, -1))(address)
@@ -88,17 +93,19 @@ class PatchSimple(PatchBase):
 
 		v = self.combine_nodes(patch, 5)
 		address_ptr = Dense(self.patch_size)(v)
-		address = self.resolve_address(address_ptr, patch)
+		# address = self.resolve_address(address_ptr, patch)
 		
-		# Memory operations
-		write_word = Dense(self.word_size, name="DenseWriteWord")(v)
-		memory_t = self.write(memory_t, address, write_word)
+		# # Memory operations
+		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
+		# memory_t = self.write(memory_t, address, write_word)
 
-		erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
-		memory_t = self.erase(memory_t, address, erase_word)
+		# erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
+		# memory_t = self.erase(memory_t, address, erase_word)
 
-		# Read after so it can loopback in a single step if it wants
-		read = self.read(memory_t, address)
+		# # Read after so it can loopback in a single step if it wants
+		# read = self.read(memory_t, address)
+
+		read = self.patch_extract(address_ptr, patch, 0)
 		
 		# v = Concatenate()([v, read])
 		out = Dense(5)(read)

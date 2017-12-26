@@ -133,7 +133,7 @@ class Dataset(object):
 		# It seems like Neo4J cannot tell us number of records to expect
 		# without us fetching them ALL :(
 		total_data = len(data)
-		logging.info(f"Total number of datum {total_data}")
+		logging.info(f"Total number of data {total_data}")
 
 		self.stream = peekable(cycle(generate_all()))
 
@@ -267,18 +267,31 @@ class DatasetHelpers(object):
 		def extract_label(l):
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
+		node_id_dict = {}
+
+		def node_id_to_memory_addr(nid):
+
+			if nid not in node_id_dict:
+				node_id_dict[nid] = len(node_id_dict) % experiment.header.meta['memory_size']
+
+			return node_id_dict[nid]
+
 		def package_node(n, l, is_head=0.0, hide_score=False):
-			score = n.properties.get("score", -1.0)
+			ms = experiment.header.meta['memory_size']
 
 			# if random.random() < experiment.header.meta["target_dropout"] or hide_score:
 			# 	score = -1.0
 
-			address_trunc = n.id % experiment.header.meta['memory_size']
-			address_one_hot = np.zeros(experiment.header.meta['memory_size'])
+			address_trunc = node_id_to_memory_addr(n.id)
+			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
 
+			# print("Address: ",address_trunc, n.id, address_one_hot)
+			logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
+
 			label = extract_label(l)
-			
+			score = n.properties.get("score", -1.0)
+
 			return np.concatenate(([is_head, score], label, address_one_hot))
 
 		def path_map(i):
