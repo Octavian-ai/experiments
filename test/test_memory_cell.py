@@ -35,40 +35,47 @@ class Tests(TestCase):
 		experiment = Experiment("test_memory_cell", header, Args(batch_size))
 
 		# Initialise memory with zeros
-		memory_tm1 = K.constant(np.zeros((batch_size, memory_size, word_size)), name="memory",dtype=float32)
+		memory_initial = np.random.random((batch_size, memory_size, word_size))
+		memory_tm1 = K.constant(memory_initial, name="memory",dtype=float32)
 		memory_t = memory_tm1
 
 		# Write address is random int
-		address_d = random.randint(0,memory_size - 1)
-		address_one_hot_d = np.zeros([batch_size, memory_size])
-		address_one_hot_d[0][address_d] = 1.0
-		address = K.constant(address_one_hot_d, name="address",dtype=float32)
+		address_w = random.randint(0,memory_size - 1)
+		address_one_hot_w = np.zeros([batch_size, memory_size])
+		address_one_hot_w[0][address_w] = 1.0
+		t_address_w = K.constant(address_one_hot_w, name="address",dtype=float32)
 
 		# Write random pattern
-		write_d = np.random.random([batch_size, word_size])
-		write = K.constant(write_d, name="write")
+		write = np.random.random([batch_size, word_size])
+		t_write = K.constant(write, name="write")
 
 		pb = PatchBase(experiment)
-		memory_t = pb.write(memory_t, address, write)
-		read = pb.read(memory_t, address)
+		memory_t = pb.write(memory_t, t_address_w, t_write)
+		read = pb.read(memory_t, t_address_w)
 
-		memory_after_write = K.eval(memory_t)
+		address_e = (address_w+1) % memory_size
+		address_one_hot_e = np.zeros([batch_size, memory_size])
+		address_one_hot_e[0][address_e] = 1.0
+		t_address_e = K.constant(address_one_hot_e, name="address",dtype=float32)
+
+		t_erase = K.constant(np.ones([batch_size, word_size]),name="erase")
+		memory_t = pb.erase(memory_t, t_address_e, t_erase)
+
 		read_final = K.eval(read)
-
-		erase = K.constant(np.ones([batch_size, word_size]),name="erase")
-		memory_t = pb.erase(memory_t, address, erase)
-
 		memory_after_erase = K.eval(memory_t)
+
+		write_expected = [write[0] + memory_initial[0][address_w]]
 
 		for i in range(batch_size):
 			for j in range(memory_size):
-				if j == address_d:
-					assert_allclose(memory_after_write[i][j],write_d[0])
+				if j == address_w:
+					assert_allclose(memory_after_erase[i][j], write_expected[0])
+				elif j == address_e:
+					assert_allclose(memory_after_erase[i][j], 0)
 				else:
-					assert_almost_equal(memory_after_write[i][j], 0)
+					assert_allclose(memory_after_erase[i][j], memory_initial[i][j])
 
-		assert_almost_equal(memory_after_erase, 0)
-		assert_allclose(read_final, write_d)
+		assert_allclose(read_final, write_expected)
 
 
 	@keras_test
