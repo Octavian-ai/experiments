@@ -38,6 +38,7 @@ class PatchBase(object):
 		n = Reshape([width])(n)
 		return n
 
+	# If you call this twice then the graph computes None as gradient
 	def patch_extract(self, address, patch, slice_begin):
 		extract_width = self.patch_width - (slice_begin % self.patch_width)
 
@@ -106,15 +107,15 @@ class PatchSimple(PatchBase):
 		# erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
 		# memory_t = self.erase(memory_t, address_erase, erase_word)
 	
-		# address_write_ptr = Dense(self.patch_size)(v)
-		# address_write = self.resolve_address(address_write_ptr, patch)
-		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
+		address_write_ptr = Dense(self.patch_size)(v)
+		address_write = self.resolve_address(address_write_ptr, patch)
+		write_word = Dense(self.word_size, name="DenseWriteWord")(v)
 		# memory_t = self.write(memory_t, address_write, write_word)
 
 		# # Read after so it can loopback in a single step if it wants
-		address_read_ptr = Dense(self.patch_size)(v)
-		address_read = self.resolve_address(address_read_ptr, patch)
-		read = self.read(memory_t, address_read)
+		# address_read_ptr = Dense(self.patch_size)(v)
+		# address_read = self.resolve_address(address_read_ptr, patch)
+		# read = self.read(memory_t, address_write)
 
 		# read = self.patch_extract(address_read_ptr, patch, 0)
 		
