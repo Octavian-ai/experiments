@@ -273,8 +273,13 @@ class DatasetHelpers(object):
 			# if random.random() < experiment.header.meta["target_dropout"] or hide_score:
 			# 	score = -1.0
 
+			address_trunc = n.id % experiment.header.meta['memory_size']
+			address_one_hot = np.zeros(experiment.header.meta['memory_size'])
+			address_one_hot[address_trunc] = 1.0
+
 			label = extract_label(l)
-			return np.concatenate(([is_head, score],label))
+			
+			return np.concatenate(([is_head, score], label, address_one_hot))
 
 		def path_map(i):
 			return package_node(i[0], i[1])

@@ -39,61 +39,15 @@ class PatchBase(object):
 		return n
 
 	def resolve_address(self, address, patch):
-		return K.ones((self.batch_size, self.memory_size))
+		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), self.memory_size, -1))(address)
+		patch_addresses = Lambda(lambda x: x[:,:,-self.memory_size::],name="PatchAddressBlock")(patch)
+		assert_shape(patch_addresses, (self.patch_size, self.memory_size))
 
-	# def expand_word_mask(self, address, mask):
-	# 	# if len(mask.shape) == 2:
-	# 	mask = K.expand_dims(mask,1)
-	# 	address = K.expand_dims(address, -1)
+		address_rows = multiply([patch_addresses, address_repeated])
+		address_resolved = Lambda(lambda x: K.sum(x,-2))(address_rows)
+		assert_shape(address_resolved, [self.memory_size])
 
-	# 	mask = K.batch_dot(address, mask)
-	# 	assert mask.shape == self.memory_shape_batch, (f"Mask is not memory shaped {mask.shape}")
-	# 	return mask
-
-	# def read(self, memory, address):
-	# 	address_expanded = K.repeat_elements(K.expand_dims(address, -1), self.word_size, -1)
-	# 	read_e = memory * address_expanded
-	# 	return K.sum(read_e, axis=1)
-
-	# def write(self, memory, address, write):
-	# 	write_e = self.expand_word_mask(address, write)
-	# 	return memory + write_e
-
-	# def erase(self, memory, address, erase):
-	# 	erase_e = self.expand_word_mask(address, erase)
-
-	# 	# I need to make this 
-	# 	# self.memory_ones = self.add_weight(shape=self.memory_shape_batch,
-	# 	# 	initializer='ones',
-	# 	# 	name='memory_ones')
-
-	# 	# memory_ones = K.zeros(self.memory_shape_batch) #  Initializer for variable recurrent_model_1/while/model_1/lambda_3/Variable/ is from inside a control-flow construct, such as a loop or conditional. When creating a variable inside a loop or conditional, use a lambda as the initializer.
-	# 	# memory_ones = tf.get_variable("memory_ones", shape=self.memory_shape_batch, initializer=tf.constant_inititializer(0))
-	# 	memory_ones = K.constant(0, shape=self.memory_shape_batch)
-
-	# 	memory_out = memory * (memory_ones - erase_e)
-	# 	return memory_out
-
-	# def memory_op(self, memory, address, write, erase):
-
-	# 	# Python lacks currying
-	# 	read_layer  = Lambda(lambda x:  self.read(x, address), output_shape=self.word_shape)
-	# 	write_layer = Lambda(lambda x: self.write(x, address, write), output_shape=self.memory_shape)
-	# 	erase_layer = Lambda(lambda x: self.erase(x, address, erase), output_shape=self.memory_shape)
-
-	# 	output = read_layer(memory)
-	# 	memory = write_layer(memory)
-	# 	memory = erase_layer(memory)
-
-	# 	assert output.shape == (self.word_shape_batch), f"Output is not a memory word {output.shape}"
-
-	# 	return output, memory
-
-
-class PatchSimple(PatchBase):
-
-	def __init__(self, experiment):
-		PatchBase.__init__(self, experiment)
+		return address_resolved 
 
 	def read(self, memory, address):
 		address_repeated = Lambda(lambda x:K.repeat_elements(K.expand_dims(x, -1), self.word_size, -1))(address)
@@ -117,6 +71,14 @@ class PatchSimple(PatchBase):
 		memory = multiply([memory, erase_mask])
 		return memory
 
+
+class PatchSimple(PatchBase):
+
+	def __init__(self, experiment):
+		PatchBase.__init__(self, experiment)
+
+	
+
 	def build(self):
 
 		patch = Input([self.patch_size, self.patch_width], name="InputPatch")
@@ -125,7 +87,8 @@ class PatchSimple(PatchBase):
 		memory_t = memory_tm1
 
 		v = self.combine_nodes(patch, 5)
-		address = Dense(self.memory_size)(v)
+		address_ptr = Dense(self.patch_size)(v)
+		address = self.resolve_address(address_ptr, patch)
 		
 		# Memory operations
 		write_word = Dense(self.word_size, name="DenseWriteWord")(v)

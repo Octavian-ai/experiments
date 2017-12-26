@@ -203,7 +203,7 @@ directory = {
 			"memory_size": 100,
 			"word_size": 4,
 			"patch_size": 20,
-			"patch_width": 7,
+			"patch_width": 107,
 			"node_control_width": 10,
 			"epochs": 5
 		}
