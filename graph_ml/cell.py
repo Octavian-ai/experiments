@@ -104,25 +104,24 @@ class PatchSimple(PatchBase):
 		# It seems that resolve_address is causing gradient=None issues 
 		
 		# # Memory operations
-		# address_erase_ptr = Dense(self.patch_size)(v)
-		# address_erase = self.resolve_address(address_erase_ptr, patch)
-		address_erase = Dense(self.memory_size)(v)
+		address_erase_ptr = Dense(self.patch_size)(v)
+		address_erase = self.resolve_address(address_erase_ptr, patch)
+		# address_erase = Dense(self.memory_size)(v)
 		erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
 		memory_t = self.erase(memory_t, address_erase, erase_word)
 	
-		address_write = Dense(self.memory_size)(v)
-		# address_write_ptr = Dense(self.patch_size)(v)
-		# address_write = self.resolve_address(address_write_ptr, patch)
+		# address_write = Dense(self.memory_size)(v)
+		address_write_ptr = Dense(self.patch_size)(v)
+		address_write = self.resolve_address(address_write_ptr, patch)
 		write_word = Dense(self.word_size, name="DenseWriteWord")(v)
 		memory_t = self.write(memory_t, address_write, write_word)
 
 		# # Read after so it can loopback in a single step if it wants
-		# address_read_ptr = Dense(self.patch_size)(v)
-		# address_read = self.resolve_address(address_read_ptr, patch)
-		address_read = Dense(self.memory_size)(v)
+		address_read_ptr = Dense(self.patch_size)(v)
+		address_read = self.resolve_address(address_read_ptr, patch)
+		# address_read = Dense(self.memory_size)(v)
 		read = self.read(memory_t, address_read)
 
-		
 		# out = Dense(5)(v)
 		# out = Concatenate()([v, read])
 
