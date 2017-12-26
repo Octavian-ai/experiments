@@ -38,7 +38,6 @@ class PatchBase(object):
 		n = Reshape([width])(n)
 		return n
 
-	# If you call this twice then the graph computes None as gradient
 	def patch_extract(self, address, patch, slice_begin):
 		extract_width = self.patch_width - (slice_begin % self.patch_width)
 
@@ -53,6 +52,8 @@ class PatchBase(object):
 		return row 
 
 	def resolve_address(self, address, patch):
+		assert_shape(address, [self.patch_size])
+		assert_shape(patch, [self.patch_size, self.patch_width])
 		return self.patch_extract(address, patch, -self.memory_size) 
 
 	def read(self, memory, address):

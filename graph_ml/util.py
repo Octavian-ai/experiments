@@ -2,6 +2,9 @@
 from keras.layers import Lambda
 import keras.backend as K
 
+# Take that keras
+from tensorflow import float32
+
 def assert_shape(tensor, shape, strict=False):
 	if strict:
 		assert hasattr(tensor, '_keras_shape'), f"{tensor.name} is missing _keras_shape"

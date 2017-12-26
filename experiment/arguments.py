@@ -19,7 +19,6 @@ class Arguments(object):
 		parser.add_argument('--not-lazy', dest='lazy', action='store_false')
 		parser.add_argument('--load-weights', action='store_true')
 
-
 		parser.add_argument('--output-dir', type=str, default="./output")
 		parser.add_argument('--data-dir', type=str, default="./data")
 
