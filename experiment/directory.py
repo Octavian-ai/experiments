@@ -199,13 +199,13 @@ directory = {
 		{
 			"target_dropout": 0.1,
 			"generator": True,
-			"sequence_size": 20,
+			"sequence_size": 2,
 			"memory_size": 100,
-			"word_size": 20,
-			"patch_size": 21,
-			"patch_width": 6,
+			"word_size": 4,
+			"patch_size": 20,
+			"patch_width": 7,
 			"node_control_width": 10,
-			"epochs": 100
+			"epochs": 5
 		}
 	),
 

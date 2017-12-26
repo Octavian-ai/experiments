@@ -109,16 +109,22 @@ class Model(object):
 			pw = experiment.header.meta["patch_width"]
 			bs = experiment.params.batch_size
 
+			# https://stackoverflow.com/questions/42969779/keras-error-you-must-feed-a-value-for-placeholder-tensor-bidirectional-1-keras
+			# K.set_learning_phase(1) #set learning phase
+
+
 			# node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
 			# neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
 			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
+			flat_patch = Reshape([ss, ps*pw])(patch)
 
-			# TODO: get rid of this req
-			
-			rnn_out = PatchRNN(experiment)(patch)
+			# rnn_out = PatchRNN(experiment)(flat_patch)
+
+			rnn = PatchSimple(experiment).build()
+
+			rnn_out = rnn(patch)
 
 			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)
-			print("score",score)
 			# score = Lambda(lambda x: K.expand_dims(x, axis=-1), name="score_reshape")(score)
 
 			# assert score.shape == [bs, ss, 1], f"Score wrong shape, {score.shape}"

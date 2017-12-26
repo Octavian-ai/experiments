@@ -267,23 +267,29 @@ class DatasetHelpers(object):
 		def extract_label(l):
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
-		def package_node(n, l, hide_score=False):
+		def package_node(n, l, is_head=0.0, hide_score=False):
 			score = n.properties.get("score", -1.0)
 
-			if random.random() < experiment.header.meta["target_dropout"] or hide_score:
-				score = -1.0
+			# if random.random() < experiment.header.meta["target_dropout"] or hide_score:
+			# 	score = -1.0
 
 			label = extract_label(l)
-			return np.concatenate(([score],label))
+			return np.concatenate(([is_head, score],label))
 
 		def path_map(i):
 			return package_node(i[0], i[1])
 
 		def t(row):
-			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.meta["patch_size"]-1)
+
+			if experiment.header.meta["patch_size"] > 1:
+				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.meta["patch_size"]-1)
 			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], True)))
-			x = np.concatenate([[h], n])
+			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
+
+			if experiment.header.meta["patch_size"] > 1:
+				x = np.concatenate([[h], n])
+			else:
+				x = np.array([h])
 
 			assert x.shape == (experiment.header.meta["patch_size"], experiment.header.meta["patch_width"])
 

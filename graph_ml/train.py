@@ -56,7 +56,7 @@ class Train(object):
 
 		callbacks = [
 			StopEarlyIfAbove(verbose=params.verbose),
-			keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
+			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
 			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/"))
 		]
 		
