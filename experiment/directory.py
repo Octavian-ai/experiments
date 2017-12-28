@@ -184,8 +184,6 @@ directory = {
 				labels(node),
 				COLLECT([otherNode, labels(otherNode)]) as neighbors
 
-			LIMIT 50
-
 		""",
 		"Special",
 		{
@@ -197,7 +195,7 @@ directory = {
 			"patch_size": 20,
 			"patch_width": 157,
 			"node_control_width": 10,
-			"epochs": 200
+			"epochs": 20
 		}
 	),
 

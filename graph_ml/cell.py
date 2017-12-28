@@ -122,44 +122,24 @@ class PatchSimple(PatchBase):
 		# v = self.combine_nodes(patch, 2)
 
 		flat_patch = Reshape([self.patch_size*self.patch_width])(patch)
-		v = Dense(1000)(flat_patch)
-
 		# first_node = Lambda(lambda x: x[:self.patch_width])(flat_patch)
 
-		# It seems that resolve_address is causing gradient=None issues 
-		# /sometimes/ I'm not sure what the boundary conditions are
-		# it might be when its output is not used
 		
-		# # Memory operations
-		# address = self.generate_address(v, patch, name="address")
-		address = Lambda(lambda x: x[:,0,-self.memory_size:], name="LambdaAddress")(patch)
-
-		erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
-		# The + x*0 is a trick to keep the function differentiatable despite us not caring about the value of x
-		erase_word = Lambda(lambda x: 1.0 + (x*0.0) )(erase_word)
-
+		# ------- Memory operations --------- #
+		erase_word = Dense(self.word_size, name="DenseEraseWord")(flat_patch)
+		address = self.generate_address(flat_patch, patch, name="address_erase")
 		memory_t = self.erase(memory_t, address, erase_word)
-
-		# Lambda(lambda x: tf.Print(x, [x]))(erase_word)
 	
-		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
-		write_word = Lambda(lambda x: x[:,0,:self.word_size])(patch)
+		write_word = Dense(self.word_size, name="DenseWriteWord")(flat_patch)
+		address = self.generate_address(flat_patch, patch, name="address_write")
 		memory_t = self.write(memory_t, address, write_word)
 
-		# # # Read after so it can loopback in a single step if it wants
+		# Read after so it can loopback in a single step if it wants
+		address = self.generate_address(flat_patch, patch, name="address_read")
 		read = self.read(memory_t, address)
-
-
-		# read = Lambda(lambda x: x[:,0,2:3])(patch) # Extract just the score we're trying to copy
-
-		# out = v
-		# out = Dense(1)(v + 0.0*read)
+		
 		# out = Concatenate()([v, read])
 		out = Dense(1)(read)
-
-		# Force network to use memory to solve problem
-		# to help verify this architecture works
-		# out = Dense(5)(read)
 
 		return RecurrentModel(
 			input=patch,

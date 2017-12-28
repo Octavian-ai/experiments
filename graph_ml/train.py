@@ -12,13 +12,13 @@ from .dataset import Dataset
 from .path import generate_output_path
 
 class StopEarlyIfAbove(keras.callbacks.Callback):
-	def __init__(self, monitor='val_acc', value=0.99, verbose=0):
+	def __init__(self, monitor='val_acc', value=0.99, verbose=0, patience=3):
 		super(keras.callbacks.Callback, self).__init__()
 		self.monitor = monitor
 		self.value = value
 		self.verbose = verbose
 		self.stopped_epoch = 0
-		self.patience = 30
+		self.patience = patience
 
 	def on_epoch_end(self, epoch, logs={}):
 		current = logs.get(self.monitor)
@@ -34,7 +34,7 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 
 	def on_train_end(self, logs=None):
 		if self.stopped_epoch > 0 and self.verbose > 0:
-			print("Epoch {}: early stopping {} > {}".format(self.stopped_epoch+1, self.monitor, self.value))
+			print("Epoch {}: early stopping {} > {}\a".format(self.stopped_epoch+1, self.monitor, self.value))
 
 
 
@@ -60,7 +60,8 @@ class Train(object):
 		callbacks = [
 			StopEarlyIfAbove(verbose=params.verbose),
 			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
-			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/"))
+			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
+			keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=4, verbose=0, mode='auto')
 		]
 		
 		logging.info("Begin training")
