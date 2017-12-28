@@ -119,23 +119,24 @@ class PatchSimple(PatchBase):
 
 		memory_t = memory_tm1
 
-		# v = self.combine_nodes(patch, 2)
-
+		conv = self.combine_nodes(patch, 100)
 		flat_patch = Reshape([self.patch_size*self.patch_width])(patch)
-		# first_node = Lambda(lambda x: x[:self.patch_width])(flat_patch)
+		first_node = Lambda(lambda x: x[:self.patch_width])(flat_patch)
+
+		patch_summary = concatenate([first_node, conv])
 
 		
 		# ------- Memory operations --------- #
-		erase_word = Dense(self.word_size, name="DenseEraseWord")(flat_patch)
-		address = self.generate_address(flat_patch, patch, name="address_erase")
+		erase_word = Dense(self.word_size, name="DenseEraseWord")(patch_summary)
+		address = self.generate_address(patch_summary, patch, name="address_erase")
 		memory_t = self.erase(memory_t, address, erase_word)
 	
-		write_word = Dense(self.word_size, name="DenseWriteWord")(flat_patch)
-		address = self.generate_address(flat_patch, patch, name="address_write")
+		write_word = Dense(self.word_size, name="DenseWriteWord")(patch_summary)
+		address = self.generate_address(patch_summary, patch, name="address_write")
 		memory_t = self.write(memory_t, address, write_word)
 
 		# Read after so it can loopback in a single step if it wants
-		address = self.generate_address(flat_patch, patch, name="address_read")
+		address = self.generate_address(patch_summary, patch, name="address_read")
 		read = self.read(memory_t, address)
 		
 		# out = Concatenate()([v, read])
