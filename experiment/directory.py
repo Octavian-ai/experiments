@@ -187,9 +187,9 @@ directory = {
 		""",
 		"Special",
 		{
-			"target_dropout": 0.1,
+			"target_dropout": 0.0,
 			"generator": True,
-			"sequence_size": 2,
+			"sequence_size": 20,
 			"memory_size": 150,
 			"word_size": 4,
 			"patch_size": 20,

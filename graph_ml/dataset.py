@@ -278,9 +278,6 @@ class DatasetHelpers(object):
 		def package_node(n, l, is_head=0.0, hide_score=False):
 			ms = experiment.header.params['memory_size']
 
-			# if random.random() < experiment.header.params["target_dropout"] or hide_score:
-			# 	score = -1.0
-
 			address_trunc = node_id_to_memory_addr(n.id)
 			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
@@ -289,6 +286,9 @@ class DatasetHelpers(object):
 
 			label = extract_label(l)
 			score = n.properties.get("score", -1.0)
+
+			if random.random() < experiment.header.params["target_dropout"] or hide_score:
+				score = -1.0
 
 			return np.concatenate(([is_head, score], label, address_one_hot))
 
@@ -300,7 +300,7 @@ class DatasetHelpers(object):
 			if experiment.header.params["patch_size"] > 1:
 				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.params["patch_size"]-1)
 			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
+			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=False)))
 
 			if experiment.header.params["patch_size"] > 1:
 				x = np.concatenate([[h], n])
