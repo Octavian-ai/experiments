@@ -18,6 +18,7 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 		self.value = value
 		self.verbose = verbose
 		self.stopped_epoch = 0
+		self.patience = 30
 
 	def on_epoch_end(self, epoch, logs={}):
 		current = logs.get(self.monitor)
@@ -26,8 +27,10 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 			exit()
 
 		if current > self.value:
-			self.stopped_epoch = epoch
-			self.model.stop_training = True
+			self.patience -= 1
+			if self.patience <= 0:
+				self.stopped_epoch = epoch
+				self.model.stop_training = True
 
 	def on_train_end(self, logs=None):
 		if self.stopped_epoch > 0 and self.verbose > 0:

@@ -2,6 +2,8 @@
 import keras
 import keras.backend as K
 
+import tensorflow as tf
+
 from keras.models import Model
 from keras.layers import *
 from recurrentshop import RecurrentModel
@@ -26,13 +28,23 @@ class PatchBase(object):
 		self.memory_shape_batch = [None] + self.memory_shape
 
 	def combine_nodes(self, patch, width):
-		n = Conv1D(
+		n1 = Conv1D(
 			filters=width, 
 			kernel_size=1, 
 			activation='tanh', 
 			kernel_initializer='random_uniform',
 			bias_initializer='zeros',
-			name="ConvPatch")(patch)
+			name="ConvPatch1")(patch)
+
+		n2 = Conv1D(
+			filters=width, 
+			kernel_size=1, 
+			activation='tanh', 
+			kernel_initializer='random_uniform',
+			bias_initializer='zeros',
+			name="ConvPatch2")(patch)
+
+		n = multiply([n1, n2])
 
 		n = MaxPooling1D(self.patch_size)(n)
 		n = Reshape([width])(n)
@@ -77,6 +89,10 @@ class PatchBase(object):
 		return memory
 
 	def erase(self, memory, address, erase):
+		assert_shape(memory, self.memory_shape)
+		assert_shape(erase, [self.word_size])
+		assert_shape(address, [self.memory_size])
+
 		erase = expand_dims(erase, 1)
 		address_expanded = expand_dims(address, -1)
 		erase_e = dot([address_expanded, erase], axes=[2,1], name="EraseExpanded")
@@ -85,128 +101,75 @@ class PatchBase(object):
 		memory = multiply([memory, erase_mask])
 		return memory
 
+	def generate_address(self, input_data, patch, name):
+		address_ptr = Dense(self.patch_size, activation="softplus",name=name)(input_data)
+		address = self.resolve_address(address_ptr, patch)
+		return address
+
+
 class PatchSimple(PatchBase):
 
 	def __init__(self, experiment):
 		PatchBase.__init__(self, experiment)
 
-	
-
 	def build(self):
 
-		patch = Input([self.patch_size, self.patch_width], name="InputPatch")
+		patch = Input((self.patch_size, self.patch_width), name="InputPatch")
+		memory_tm1 = Input((self.memory_shape), name="Memory")
 
-		memory_tm1 = Input(self.memory_shape, name="Memory")
 		memory_t = memory_tm1
 
-		v = self.combine_nodes(patch, 5)
+		# v = self.combine_nodes(patch, 2)
+
+		flat_patch = Reshape([self.patch_size*self.patch_width])(patch)
+		v = Dense(1000)(flat_patch)
+
+		# first_node = Lambda(lambda x: x[:self.patch_width])(flat_patch)
 
 		# It seems that resolve_address is causing gradient=None issues 
+		# /sometimes/ I'm not sure what the boundary conditions are
+		# it might be when its output is not used
 		
 		# # Memory operations
-		address_erase_ptr = Dense(self.patch_size, activation="softplus")(v)
-		address_erase = self.resolve_address(address_erase_ptr, patch)
-		# address_erase = Dense(self.memory_size)(v)
+		# address = self.generate_address(v, patch, name="address")
+		address = Lambda(lambda x: x[:,0,-self.memory_size:], name="LambdaAddress")(patch)
+
 		erase_word = Dense(self.word_size, name="DenseEraseWord")(v)
-		memory_t = self.erase(memory_t, address_erase, erase_word)
+		# The + x*0 is a trick to keep the function differentiatable despite us not caring about the value of x
+		erase_word = Lambda(lambda x: 1.0 + (x*0.0) )(erase_word)
+
+		memory_t = self.erase(memory_t, address, erase_word)
+
+		# Lambda(lambda x: tf.Print(x, [x]))(erase_word)
 	
-		# address_write = Dense(self.memory_size)(v)
-		# address_write_ptr = Dense(self.patch_size)(v)
-		# address_write = self.resolve_address(address_write_ptr, patch)
-		write_word = Dense(self.word_size, name="DenseWriteWord")(v)
-		memory_t = self.write(memory_t, address_erase, write_word)
+		# write_word = Dense(self.word_size, name="DenseWriteWord")(v)
+		write_word = Lambda(lambda x: x[:,0,:self.word_size])(patch)
+		memory_t = self.write(memory_t, address, write_word)
 
-		# # Read after so it can loopback in a single step if it wants
-		# address_read_ptr = Dense(self.patch_size)(v)
-		# address_read = self.resolve_address(address_read_ptr, patch)
-		# address_read = Dense(self.memory_size)(v)
-		read = self.read(memory_t, address_erase)
+		# # # Read after so it can loopback in a single step if it wants
+		read = self.read(memory_t, address)
 
-		# out = Dense(5)(v)
+
+		# read = Lambda(lambda x: x[:,0,2:3])(patch) # Extract just the score we're trying to copy
+
+		# out = v
+		# out = Dense(1)(v + 0.0*read)
 		# out = Concatenate()([v, read])
+		out = Dense(1)(read)
 
 		# Force network to use memory to solve problem
 		# to help verify this architecture works
-		out = Dense(5)(read)
+		# out = Dense(5)(read)
 
 		return RecurrentModel(
 			input=patch,
 			output=out,
 			return_sequences=True,
+			# stateful=True,
 
 			initial_states=[memory_tm1],
 			final_states=[memory_t],
 			state_initializer=[initializers.random_normal(stddev=1.0)]
 		)
-
-
-
-class PatchRNN(PatchBase):
-
-	def __init__(self, experiment):
-		PatchBase.__init__(self, experiment)
-
-
-	def __call__(self, patch_in):
-		batch_size  = self.experiment.params.batch_size
-		patch_size  = self.experiment.header.params["patch_size"]
-		patch_width = self.experiment.header.params["patch_width"]
-		memory_size = self.experiment.header.params["memory_size"]
-		word_size   = self.experiment.header.params["word_size"]
-		node_control_width = self.experiment.header.params["node_control_width"]
-
-		# patch = Input(batch_shape=(batch_size, patch_size, patch_width), name="InputPatch")
-		# memory_in = Input(batch_shape=(batch_size, memory_size, word_size), name="InputMemory")
-		# patch = Input((patch_size, patch_width), name="InputPatch")
-		memory_in = Input((memory_size, word_size), name="InputMemory")
-		patch_flat = Input([patch_size*patch_width], name="InputPatch")
-
-		patch = Reshape([patch_size, patch_width])(patch_flat)
-
-		assert_shape(patch, (patch_size, patch_width))
-		assert_shape(memory_in, (memory_size, word_size))
-
-		all_control = self.combine_nodes(patch, node_control_width)
-
-		address_reference = Dense(patch_size)(all_control)
-		write = Dense(word_size)(all_control)
-		erase = Dense(word_size)(all_control)
-
-		address_resolved = self.resolve_address(address_reference, patch)
-
-		assert_shape(address_resolved, [memory_size])
-		assert_shape(erase, [word_size])
-		assert_shape(write, [word_size])
-
-		out, memory_out = self.memory_op(memory_in, address_resolved, write, erase)
-
-		# out = Concatenate()([all_control, out]) # Combo
-		out = Dense(patch_width,name="DenseFinalOut")(out) # Normal option
-
-		# return Model([patch, memory_in], [out, memory_out])
-		return RecurrentModel(
-			input=patch_flat,
-			output=out,
-			initial_states=[memory_in],
-			final_states=[memory_out],
-			state_initializer=[initializers.zeros()],
-			return_sequences=True
-		)(patch_in)
-
-
-
-# class PatchRNN(object):
-
-# 	def __init__(self, experiment):
-# 		self.experiment = experiment
-
-# 	def __call__(self, layer_in):
-# 		patch_size  = self.experiment.header.params["patch_size"]
-# 		patch_width = self.experiment.header.params["patch_width"]
-# 		cell = PatchCell(self.experiment, output_dim=patch_width, input_shape=(patch_size, patch_width))
-# 		# get_layer accepts arguments like return_sequences, unroll etc :
-# 		return cell.get_layer(return_sequences=True)(layer_in)
-
-
 
 

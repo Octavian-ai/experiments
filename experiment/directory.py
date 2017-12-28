@@ -197,7 +197,7 @@ directory = {
 			"patch_size": 20,
 			"patch_width": 157,
 			"node_control_width": 10,
-			"epochs": 50
+			"epochs": 200
 		}
 	),
 
