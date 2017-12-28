@@ -278,8 +278,8 @@ class DatasetHelpers(object):
 		def package_node(n, l, is_head=0.0, hide_score=False):
 			ms = experiment.header.params['memory_size']
 
-			if random.random() < experiment.header.params["target_dropout"] or hide_score:
-				score = -1.0
+			# if random.random() < experiment.header.params["target_dropout"] or hide_score:
+			# 	score = -1.0
 
 			address_trunc = node_id_to_memory_addr(n.id)
 			address_one_hot = np.zeros(ms)
