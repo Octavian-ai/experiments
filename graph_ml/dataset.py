@@ -109,32 +109,34 @@ class Dataset(object):
 		# and because we need to know the steps_per_epoch for Keras
 		# the data is in memory for now - sorry brah
 
-		# But all this downstream is legit generators!
+		# But all the downstream is legit generators!
 
 		def generate_all():
 			c = 0
-			for i in data:
+			while True:
+				random.shuffle(data)
+				for i in data:
 
-				p = recipe.split(i)
-				p.x = recipe.finalize_x(p.x)
-				
-				if c == 9:
-					l = "test"
-				elif c == 8:
-					l = "validate"
-				else:
-					l = "train"
+					p = recipe.split(i)
+					p.x = recipe.finalize_x(p.x)
+					
+					if c == 9:
+						l = "test"
+					elif c == 8:
+						l = "validate"
+					else:
+						l = "train"
 
-				c = (c + 1) % 10
+					c = (c + 1) % 10
 
-				yield (l, p)
+					yield (l, p)
 
 		# It seems like Neo4J cannot tell us number of records to expect
 		# without us fetching them ALL :(
 		total_data = len(data)
 		logging.info(f"Total number of data {total_data}")
 
-		self.stream = peekable(cycle(generate_all()))
+		self.stream = peekable(generate_all())
 
 		def just(tag):
 			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
@@ -176,9 +178,9 @@ class Dataset(object):
 		# logging.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
-		self.validation_steps = int(total_data * 0.1)
-		self.test_steps = int(total_data * 0.1)
-		self.steps_per_epoch = int(total_data * 0.8 / experiment.params.batch_size)
+		self.validation_steps 	= int(total_data * 0.1 / experiment.params.batch_size)
+		self.test_steps 		= int(total_data * 0.1 / experiment.params.batch_size)
+		self.steps_per_epoch 	= int(total_data * 0.8 / experiment.params.batch_size)
 
 		self.input_shape = (len(self.stream.peek()[0]),)
 
@@ -300,7 +302,7 @@ class DatasetHelpers(object):
 			if experiment.header.params["patch_size"] > 1:
 				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.params["patch_size"]-1)
 			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=False)))
+			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
 
 			if experiment.header.params["patch_size"] > 1:
 				x = np.concatenate([[h], n])

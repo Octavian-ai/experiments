@@ -25,7 +25,8 @@ class PatchBase(object):
 		self.word_shape = [self.word_size]
 		self.word_shape_batch = [self.batch_size, self.word_size]
 		self.memory_shape = [self.memory_size, self.word_size]
-		self.memory_shape_batch = [None] + self.memory_shape
+		self.memory_shape_batch = [self.batch_size] + self.memory_shape
+
 
 	def combine_nodes(self, patch, width):
 		n1 = Conv1D(
@@ -45,6 +46,14 @@ class PatchBase(object):
 			name="ConvPatch2")(patch)
 
 		n = multiply([n1, n2])
+
+		n = Conv1D(
+			filters=width, 
+			kernel_size=1, 
+			activation='tanh', 
+			kernel_initializer='random_uniform',
+			bias_initializer='zeros',
+			name="ConvPatch3")(n)
 
 		n = MaxPooling1D(self.patch_size)(n)
 		n = Reshape([width])(n)
@@ -115,7 +124,7 @@ class PatchSimple(PatchBase):
 	def build(self):
 
 		patch = Input((self.patch_size, self.patch_width), name="InputPatch")
-		memory_tm1 = Input((self.memory_shape), name="Memory")
+		memory_tm1 = Input(batch_shape=self.memory_shape_batch, name="Memory")
 
 		memory_t = memory_tm1
 
@@ -146,7 +155,7 @@ class PatchSimple(PatchBase):
 			input=patch,
 			output=out,
 			return_sequences=True,
-			# stateful=True,
+			stateful=True,
 
 			initial_states=[memory_tm1],
 			final_states=[memory_t],
