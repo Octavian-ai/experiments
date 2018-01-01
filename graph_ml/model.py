@@ -6,7 +6,7 @@ import keras.backend as K
 
 import tensorflow as tf
 
-from .cell import *
+from .ntm import *
 
 
 # Rainbow sprinkles for your activation function
@@ -118,10 +118,7 @@ class Model(object):
 			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
 			flat_patch = Reshape([ss, ps*pw])(patch)
 
-			# rnn_out = PatchRNN(experiment)(flat_patch)
-
-			rnn = PatchSimple(experiment).build()
-
+			rnn = PatchNTM(experiment).build()
 			rnn_out = rnn(patch)
 
 			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)

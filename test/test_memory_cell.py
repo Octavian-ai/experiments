@@ -16,7 +16,7 @@ from tensorflow import float32
 from unittest import TestCase
 
 from graph_ml import Train, Dataset
-from graph_ml import PatchBase
+from graph_ml import NTMBase
 from experiment import Experiment, ExperimentHeader
 
 Args = namedtuple('DummyArgs', 'batch_size')
@@ -49,7 +49,7 @@ class Tests(TestCase):
 		write = np.random.random([batch_size, word_size])
 		t_write = K.constant(write, name="write")
 
-		pb = PatchBase(experiment)
+		pb = NTMBase(experiment)
 		memory_t = pb.write(memory_t, t_address_w, t_write)
 		read = pb.read(memory_t, t_address_w)
 
@@ -104,7 +104,7 @@ class Tests(TestCase):
 		t_write = K.constant(write, name="write")
 		t_erase = K.constant(np.ones([batch_size, word_size]),name="erase")
 
-		pb = PatchBase(experiment)
+		pb = NTMBase(experiment)
 		memory_t = pb.erase(memory_t, t_address, t_erase)
 		memory_t = pb.write(memory_t, t_address, t_write)
 		t_read   = pb.read( memory_t, t_address)
@@ -135,7 +135,7 @@ class Tests(TestCase):
 
 		t_patch = K.constant(patch, dtype=float32, name="patch")
 		t_pointer_one_hot = K.constant(pointer_one_hot, dtype=float32, name="pointer_one_hot")
-		pb = PatchBase(experiment)
+		pb = NTMBase(experiment)
 		resolved = K.eval(pb.resolve_address(t_pointer_one_hot, t_patch))
 
 		for i in range(batch_size):
@@ -156,7 +156,7 @@ class Tests(TestCase):
 		header = ExperimentHeader(params={"word_size":word_size, "memory_size":memory_size, "patch_size":patch_size, "patch_width":patch_width})
 		experiment = Experiment("test_memory_cell", header, Args(batch_size))
 
-		pb = PatchBase(experiment)
+		pb = NTMBase(experiment)
 
 		ptr = Input((patch_size,), name="ptr")
 		patch = Input((patch_size,patch_width), name="patch")
@@ -197,7 +197,7 @@ class Tests(TestCase):
 		header = ExperimentHeader(params={"word_size":word_size, "memory_size":memory_size, "patch_size":patch_size, "patch_width":patch_width})
 		experiment = Experiment("test_memory_cell", header, Args(batch_size))
 
-		pb = PatchBase(experiment)
+		pb = NTMBase(experiment)
 
 		patch = Input((patch_size, patch_width), name="patch")
 		memory_tm1 = Input((memory_size, word_size), name="memory")
@@ -253,7 +253,7 @@ class Tests(TestCase):
 		header = ExperimentHeader(params={"word_size":word_size, "memory_size":memory_size, "patch_size":patch_size, "patch_width":patch_width})
 		experiment = Experiment("test_memory_cell", header, Args(batch_size))
 
-		pb = PatchBase(experiment)
+		pb = NTMBase(experiment)
 
 		patch = Input((patch_size, patch_width), name="patch")
 		memory_tm1 = Input((memory_size, word_size), name="memory")

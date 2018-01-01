@@ -10,7 +10,7 @@ from recurrentshop import RecurrentModel
 
 from .util import *
 
-class PatchBase(object):
+class NTMBase(object):
 
 	def __init__(self, experiment):
 		self.experiment = experiment
@@ -120,10 +120,10 @@ class PatchBase(object):
 		return address
 
 
-class PatchSimple(PatchBase):
+class PatchNTM(NTMBase):
 
 	def __init__(self, experiment):
-		PatchBase.__init__(self, experiment)
+		NTMBase.__init__(self, experiment)
 
 	def build(self):
 
