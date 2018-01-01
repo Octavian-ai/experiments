@@ -88,10 +88,12 @@ class Dataset(object):
 		if experiment.params.random_seed is not None:
 			random.seed(params.random_seed)
 
-		global_params = QueryParams(
+		query_params = QueryParams(
 			golden=experiment.params.golden, 
 			dataset_name=experiment.header.dataset_name, 
 			experiment=experiment.name)
+
+		query_params.update(experiment.header.params)
 
 		dataset_file = generate_output_path(experiment, '.pkl')
 
@@ -102,7 +104,7 @@ class Dataset(object):
 		else:
 			logging.info("Querying data from database")
 			with SimpleNodeClient() as client:
-				data = client.run(CypherQuery(experiment.header.cypher_query), global_params).data()
+				data = client.run(CypherQuery(experiment.header.cypher_query), query_params).data()
 			pickle.dump(data, open(dataset_file, "wb"))
 
 		# Because we run through the data every epoch, and for test and validate and train
@@ -180,7 +182,7 @@ class Dataset(object):
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= int(total_data * 0.1 / experiment.params.batch_size)
 		self.test_steps 		= int(total_data * 0.1 / experiment.params.batch_size)
-		self.steps_per_epoch 	= int(total_data * 0.8 / experiment.params.batch_size)
+		self.steps_per_epoch 	= int(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
 
 		self.input_shape = (len(self.stream.peek()[0]),)
 

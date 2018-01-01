@@ -183,6 +183,7 @@ directory = {
 				node,
 				labels(node),
 				COLLECT([otherNode, labels(otherNode)]) as neighbors
+			LIMIT {memory_size}
 
 		""",
 		"Special",
@@ -190,12 +191,13 @@ directory = {
 			"target_dropout": 0.0,
 			"generator": True,
 			"sequence_size": 20,
-			"memory_size": 150,
+			"memory_size": 1000,
 			"word_size": 4,
 			"patch_size": 20,
-			"patch_width": 157,
+			"patch_width": 1007,
 			"node_control_width": 10,
-			"epochs": 20
+			"epochs": 20,
+			"repeat_batch": 10
 		}
 	),
 

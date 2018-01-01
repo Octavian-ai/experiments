@@ -80,11 +80,9 @@ class Train(object):
 			StopEarlyIfAbove(verbose=params.verbose),
 			# TraceCallback(),
 			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
-			keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
+			# keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
 			# keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=4, verbose=0, mode='auto')
 		]
-		
-		logging.info("Begin training")
 
 		# TODO: move to more general overriding mechanism
 		# Perhaps unify os.environ, arguments, experiment parameters

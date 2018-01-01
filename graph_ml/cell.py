@@ -29,13 +29,17 @@ class PatchBase(object):
 
 
 	def combine_nodes(self, patch, width):
+		patch_data_width = self.patch_width - self.memory_size
+
+		patch_data = Lambda(lambda x: x[:,:,0:patch_data_width:])(patch)
+
 		n1 = Conv1D(
 			filters=width, 
 			kernel_size=1, 
 			activation='tanh', 
 			kernel_initializer='random_uniform',
 			bias_initializer='zeros',
-			name="ConvPatch1")(patch)
+			name="ConvPatch1")(patch_data)
 
 		n2 = Conv1D(
 			filters=width, 
@@ -43,7 +47,7 @@ class PatchBase(object):
 			activation='tanh', 
 			kernel_initializer='random_uniform',
 			bias_initializer='zeros',
-			name="ConvPatch2")(patch)
+			name="ConvPatch2")(patch_data)
 
 		n = multiply([n1, n2])
 
@@ -123,33 +127,45 @@ class PatchSimple(PatchBase):
 
 	def build(self):
 
+		working_width = 128
+
 		patch = Input((self.patch_size, self.patch_width), name="InputPatch")
 		memory_tm1 = Input(batch_shape=self.memory_shape_batch, name="Memory")
 
 		memory_t = memory_tm1
 
-		conv = self.combine_nodes(patch, 100)
+		conv = self.combine_nodes(patch, working_width)
 		flat_patch = Reshape([self.patch_size*self.patch_width])(patch)
 		first_node = Lambda(lambda x: x[:self.patch_width])(flat_patch)
 
-		patch_summary = concatenate([first_node, conv])
+		working_memory = concatenate([first_node, conv])
 
-		
 		# ------- Memory operations --------- #
-		erase_word = Dense(self.word_size, name="DenseEraseWord")(patch_summary)
-		address = self.generate_address(patch_summary, patch, name="address_erase")
+
+		address = self.generate_address(working_memory, patch, name="address_read")
+		read = self.read(memory_t, address)
+
+		# I want to read, and add that to working memory
+		# read = Reshape([self.word_size])(read)
+		# working_memory = concatenate([working_memory, read], batch_size=self.batch_size)
+		working_memory = Dense(working_width,activation='tanh')(working_memory)
+
+		erase_word = Dense(self.word_size, name="DenseEraseWord")(working_memory)
+		address = self.generate_address(working_memory, patch, name="address_erase")
 		memory_t = self.erase(memory_t, address, erase_word)
 	
-		write_word = Dense(self.word_size, name="DenseWriteWord")(patch_summary)
-		address = self.generate_address(patch_summary, patch, name="address_write")
+		write_word = Dense(self.word_size, name="DenseWriteWord")(working_memory)
+		address = self.generate_address(working_memory, patch, name="address_write")
 		memory_t = self.write(memory_t, address, write_word)
 
 		# Read after so it can loopback in a single step if it wants
-		address = self.generate_address(patch_summary, patch, name="address_read")
-		read = self.read(memory_t, address)
-		
-		# out = Concatenate()([v, read])
-		out = Dense(1)(read)
+		address = self.generate_address(working_memory, patch, name="address_read")
+		read2 = self.read(memory_t, address)
+
+		# I'd like to use working memory and the read to drive the output
+		# working_memory = concatenate([working_memory, read2])
+		# working_memory = Lambda(lambda x: K.concatenate([x, read2]))(working_memory)
+		out = Dense(1)(read2)
 
 		return RecurrentModel(
 			input=patch,
