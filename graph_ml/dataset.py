@@ -10,13 +10,13 @@ import logging
 import itertools
 from itertools import cycle
 import more_itertools
+from more_itertools import peekable
 
 import keras
 import numpy as np
 from keras.preprocessing import text
 from keras.utils import np_utils
 
-import experiment
 from .path import generate_output_path
 from graph_io import *
 
@@ -33,7 +33,10 @@ class Point(object):
 		self.y.append(point.y)
 
 	def __str__(self):
-		return "{x: " + str(self.x) + ",\ny: " + str(self.y) + "}"
+		return "{x:\n" + str(self.x) + ",\ny:\n" + str(self.y) + "}"
+
+	def __repr__(self):
+		return self.__str__()
 
 
 class Recipe:
@@ -85,10 +88,12 @@ class Dataset(object):
 		if experiment.params.random_seed is not None:
 			random.seed(params.random_seed)
 
-		global_params = QueryParams(
+		query_params = QueryParams(
 			golden=experiment.params.golden, 
 			dataset_name=experiment.header.dataset_name, 
 			experiment=experiment.name)
+
+		query_params.update(experiment.header.params)
 
 		dataset_file = generate_output_path(experiment, '.pkl')
 
@@ -99,60 +104,85 @@ class Dataset(object):
 		else:
 			logging.info("Querying data from database")
 			with SimpleNodeClient() as client:
-				data = client.run(CypherQuery(experiment.header.cypher_query), global_params).data()
+				data = client.run(CypherQuery(experiment.header.cypher_query), query_params).data()
 			pickle.dump(data, open(dataset_file, "wb"))
 
 		# Because we run through the data every epoch, and for test and validate and train
 		# and because we need to know the steps_per_epoch for Keras
 		# the data is in memory for now - sorry brah
 
-		# But all this downstream is legit generators!
+		# But all the downstream is legit generators!
 
 		def generate_all():
 			c = 0
-			for i in data:
+			while True:
+				random.shuffle(data)
+				for i in data:
 
-				p = recipe.split(i)
-				p.x = recipe.finalize_x(p.x)
-				
-				if c == 9:
-					l = "test"
-				elif c == 8:
-					l = "validate"
-				else:
-					l = "train"
+					p = recipe.split(i)
+					p.x = recipe.finalize_x(p.x)
+					
+					if c == 9:
+						l = "test"
+					elif c == 8:
+						l = "validate"
+					else:
+						l = "train"
 
-				c = (c + 1) % 10
+					c = (c + 1) % 10
 
-				yield (l, p)
+					yield (l, p)
 
 		# It seems like Neo4J cannot tell us number of records to expect
 		# without us fetching them ALL :(
 		total_data = len(data)
-		logging.info(f"Total number of datum {total_data}")
+		logging.info(f"Total number of data {total_data}")
 
-		self.stream = more_itertools.peekable(cycle(generate_all()))
+		self.stream = peekable(generate_all())
 
 		def just(tag):
 			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
 
-		def chunk(it):
-			chunky = more_itertools.chunked(it, experiment.params.batch_size)
-
+		def chunk(it, length):
+			chunky = more_itertools.chunked(it, length)
 			for i in chunky:
-				xs = np.array([j[0] for j in i])
-				ys = np.array([j[1] for j in i])
-				yield (xs, ys)
+					xs = np.array([j[0] for j in i])
+					ys = np.array([j[1] for j in i])
+					yield (xs, ys)
+
+		def chunk_key(it, length, keys):
+			chunky = more_itertools.chunked(it, length)
+
+			def c(k):
+				for i in chunky:
+					xs = np.array([j[0][k] for j in i])
+					ys = np.array([j[1] for j in i])
+					yield (xs, ys)
+
+			return {k: c(k) for k in keys}
 
 		
-		self.train_generator 		= chunk(just("train"))
-		self.validation_generator 	= chunk(just("validate"))
-		self.test_generator 		= chunk(just("test"))
+		bs = experiment.params.batch_size
+		ss = experiment.header.params["sequence_size"]
+
+		def chunk_chunk(it, keys=None):
+			return chunk(chunk(it, ss), bs)
+
+		def chunk_chunk_key(it, key):
+			return chunk_key(chunk_key(it, ss, key), bs, key)
+
+		keys = ["neighbor", "node"]
+
+		self.train_generator 		= peekable(chunk_chunk(just("train"), keys))
+		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
+		self.test_generator 		= chunk_chunk(just("test"), keys)
+
+		# logging.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
-		self.validation_steps = int(total_data * 0.1)
-		self.test_steps = int(total_data * 0.1)
-		self.steps_per_epoch = int(total_data * 0.8 / experiment.params.batch_size)
+		self.validation_steps 	= int(total_data * 0.1 / experiment.params.batch_size)
+		self.test_steps 		= int(total_data * 0.1 / experiment.params.batch_size)
+		self.steps_per_epoch 	= int(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
 
 		self.input_shape = (len(self.stream.peek()[0]),)
 
@@ -217,7 +247,7 @@ class DatasetHelpers(object):
 	@classmethod
 	def review_from_all_hidden(cls, experiment):
 		def t(row):
-			length = experiment.header.meta["neighbor_count"]
+			length = experiment.header.params["neighbor_count"]
 			neighbors = np.array(row["neighbors"])
 			delta = length - neighbors.shape[0]
 
@@ -238,28 +268,52 @@ class DatasetHelpers(object):
 		}
 
 		def extract_label(l):
-			print(list(set(l) - set('NODE'))[0])
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
-		def package_node(n, l, hide_score=False):
-			score = n.properties.get("score", -1.0)
+		node_id_dict = {}
 
-			if random.random() < experiment.header.meta["target_dropout"] or hide_score:
-				score = -1.0
+		def node_id_to_memory_addr(nid):
+
+			if nid not in node_id_dict:
+				node_id_dict[nid] = len(node_id_dict) % experiment.header.params['memory_size']
+
+			return node_id_dict[nid]
+
+		def package_node(n, l, is_head=0.0, hide_score=False):
+			ms = experiment.header.params['memory_size']
+
+			address_trunc = node_id_to_memory_addr(n.id)
+			address_one_hot = np.zeros(ms)
+			address_one_hot[address_trunc] = 1.0
+
+			# logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
 
 			label = extract_label(l)
-			return np.concatenate(([score],label, np.zeros(experiment.header.meta["state"])))
+			score = n.properties.get("score", -1.0)
+
+			if random.random() < experiment.header.params["target_dropout"] or hide_score:
+				score = -1.0
+
+			return np.concatenate(([is_head, score], label, address_one_hot))
 
 		def path_map(i):
 			return package_node(i[0], i[1])
 
 		def t(row):
-			n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, 20)
-			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], True)))
-			x = np.concatenate(([h], n))
 
-			return Point(x, row["node"].properties.get("score", -1.0))
+			if experiment.header.params["patch_size"] > 1:
+				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.params["patch_size"]-1)
+			
+			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
+
+			if experiment.header.params["patch_size"] > 1:
+				x = np.concatenate([[h], n])
+			else:
+				x = np.array([h])
+
+			assert x.shape == (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
+
+			return Point(x, [row["node"].properties.get("score", -1.0)])
 
 		return t
 

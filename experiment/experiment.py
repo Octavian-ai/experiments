@@ -3,6 +3,7 @@ from datetime import datetime
 from colorama import init, Fore, Style
 import logging
 import coloredlogs
+import colored_traceback.auto
 
 from graph_ml import Train, Dataset
 from .arguments import Arguments

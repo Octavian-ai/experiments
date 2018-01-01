@@ -1,19 +1,9 @@
 from data_sets.synthetic_review_prediction import EXPERIMENT_1_DATASET, \
 	EXPERIMENT_2_DATASET, EXPERIMENT_3_DATASET, EXPERIMENT_4_DATASET
-from graph_io.classes import DatasetName
 
 from basic_types import NanoType
 
-
-class ExperimentHeader(object):
-	def __init__(self, doc, dataset_name: DatasetName, cypher_query, target, meta={}):
-		# Jesus I have to spell this out?!
-		# WTF are the python language devs doing?!
-		self.dataset_name = dataset_name
-		self.doc = doc
-		self.cypher_query = cypher_query
-		self.target = target
-		self.meta = meta
+from .experiment_header import ExperimentHeader
 
 shared_query = {
 	"product_and_product_subgraph": """
@@ -193,13 +183,21 @@ directory = {
 				node,
 				labels(node),
 				COLLECT([otherNode, labels(otherNode)]) as neighbors
+			LIMIT {memory_size}
 
 		""",
 		"Special",
 		{
-			"target_dropout": 0.1,
-			"state": 8,
-			"generator": True
+			"target_dropout": 0.0,
+			"generator": True,
+			"sequence_size": 20,
+			"memory_size": 1000,
+			"word_size": 4,
+			"patch_size": 20,
+			"patch_width": 1007,
+			"node_control_width": 10,
+			"epochs": 20,
+			"repeat_batch": 10
 		}
 	),
 
@@ -227,6 +225,6 @@ directory = {
 
 }
 
-default_experiment = "style_from_neighbor_rnn"
+default_experiment = "review_from_all_hidden_patch_rnn"
 
 

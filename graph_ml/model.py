@@ -2,8 +2,11 @@
 import keras
 from keras.models import Sequential, Model
 from keras.layers import *
+import keras.backend as K
 
 import tensorflow as tf
+
+from .ntm import *
 
 
 # Rainbow sprinkles for your activation function
@@ -85,33 +88,43 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
+
 		elif experiment.name == "review_from_all_hidden_simple_unroll":
 			thinking_width = 10
 
-			neighbors = Input(shape=(experiment.header.meta["neighbor_count"],4,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(experiment.header.params["neighbor_count"],4,), dtype='float32', name='neighbors')
 			m = Conv1D(thinking_width, 1, activation='tanh')(neighbors)
-			m = MaxPooling1D(experiment.header.meta["neighbor_count"])(m)
+			m = MaxPooling1D(experiment.header.params["neighbor_count"])(m)
 			m = Reshape([thinking_width])(m)
 			m = Dense(1)(m)
 			m = Activation("sigmoid", name='final_activation')(m)
 
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
+
 		elif experiment.name == 'review_from_all_hidden_patch_rnn':
 
-			width = 14*21
+			ss = experiment.header.params["sequence_size"]
+			ps = experiment.header.params["patch_size"]
+			pw = experiment.header.params["patch_width"]
+			bs = experiment.params.batch_size
 
-			patch = Input(shape=(21,14,), dtype='float32', name="patch")
+			# https://stackoverflow.com/questions/42969779/keras-error-you-must-feed-a-value-for-placeholder-tensor-bidirectional-1-keras
+			# K.set_learning_phase(1) #set learning phase
 
-			flat = Reshape((width,), name="flat")(patch)
 
-			transform_layer = Dense(width, activation="tanh", name="transform")
+			# node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
+			# neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
+			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
+			flat_patch = Reshape([ss, ps*pw])(patch)
 
-			# TODO: experiment with manually unrolling here
-			m = transform_layer(flat)
-			# m = tf.Print(m, [m, "hiya"])
-			m = transform_layer(m)
-			score = Dense(1, activation="tanh", name="score")(m)
+			rnn = PatchNTM(experiment).build()
+			rnn_out = rnn(patch)
+
+			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)
+			# score = Lambda(lambda x: K.expand_dims(x, axis=-1), name="score_reshape")(score)
+
+			# assert score.shape == [bs, ss, 1], f"Score wrong shape, {score.shape}"
 			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 

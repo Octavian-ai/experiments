@@ -5,6 +5,9 @@ class QueryParams(object):
     def __init__(self, **kwargs):
         self._params = kwargs
 
+    def update(self,other):
+        self._params.update(other)
+
     @property
     def query_string(self):
         return "{" + ", ".join(f"{name}: ${name}" for name in self._params) + "}"
