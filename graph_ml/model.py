@@ -102,7 +102,7 @@ class Model(object):
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
 
-		elif experiment.name == 'review_from_all_hidden_patch_rnn':
+		elif experiment.name == 'review_from_all_hidden_ntm':
 
 			ss = experiment.header.params["sequence_size"]
 			ps = experiment.header.params["patch_size"]
@@ -131,7 +131,6 @@ class Model(object):
 			model.compile(loss=keras.losses.mean_squared_error,
 				optimizer=keras.optimizers.SGD(lr=0.3),
 				metrics=['accuracy'])
-
 
 
 

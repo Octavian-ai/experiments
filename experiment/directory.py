@@ -170,34 +170,30 @@ directory = {
 		}
 	),
 
-	"review_from_all_hidden_patch_rnn": ExperimentHeader(
+	"review_from_all_hidden_ntm": ExperimentHeader(
 		"""
 			Let's try to do a RNN that operates on pieces of the graph
 
 		""",
 		EXPERIMENT_4_DATASET,
 		"""
-			MATCH g=(node {dataset_name:{dataset_name}}) --> (otherNode)
-
-			RETURN
-				node,
-				labels(node),
-				COLLECT([otherNode, labels(otherNode)]) as neighbors
-			LIMIT {memory_size}
-
+			MATCH g=(node:REVIEW {dataset_name:{dataset_name}}) -[*5]- (otherNode)
+			RETURN g
+			LIMIT 50000
 		""",
 		"Special",
 		{
 			"target_dropout": 0.0,
-			"generator": True,
 			"sequence_size": 20,
 			"memory_size": 1000,
 			"word_size": 4,
-			"patch_size": 20,
-			"patch_width": 1007,
+			"patch_width": 1006,
+			"patch_size": 6,
 			"node_control_width": 10,
 			"epochs": 20,
-			"repeat_batch": 10
+			"repeat_batch": 1,
+			"use_memory": False,
+			"working_width": 128,
 		}
 	),
 
@@ -225,6 +221,6 @@ directory = {
 
 }
 
-default_experiment = "review_from_all_hidden_patch_rnn"
+default_experiment = "review_from_all_hidden_ntm"
 
 

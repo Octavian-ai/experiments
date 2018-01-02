@@ -4,6 +4,7 @@ from colorama import init, Fore, Style
 import logging
 import coloredlogs
 import colored_traceback.auto
+import os
 
 from graph_ml import Train, Dataset
 from .arguments import Arguments
@@ -46,4 +47,6 @@ class Experiment(object):
 		print(f"{experiment.name} test accuracy {score[1]}")
 		print("#######################################################################")
 		print(Style.RESET_ALL)
+
+		os.system(f"say test accuracy {score[1]}")
 		

@@ -5,6 +5,7 @@ import pickle
 import os.path
 import hashlib
 import neo4j
+import math
 from typing import Callable
 import logging
 import itertools
@@ -70,8 +71,8 @@ class Dataset(object):
 			'review_from_all_hidden_simple_unroll': Recipe(
 				DatasetHelpers.review_from_all_hidden(experiment)
 			),
-			'review_from_all_hidden_patch_rnn': Recipe(
-				DatasetHelpers.review_from_all_hidden_patch_rnn(experiment)
+			'review_from_all_hidden_ntm': Recipe(
+				DatasetHelpers.review_from_all_hidden_ntm(experiment)
 			)
 		}
 
@@ -177,12 +178,12 @@ class Dataset(object):
 		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
 		self.test_generator 		= chunk_chunk(just("test"), keys)
 
-		# logging.info(f"First training item: {self.train_generator.peek()}")
+		logging.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
-		self.validation_steps 	= int(total_data * 0.1 / experiment.params.batch_size)
-		self.test_steps 		= int(total_data * 0.1 / experiment.params.batch_size)
-		self.steps_per_epoch 	= int(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
+		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
+		self.test_steps 		= math.ceil(total_data * 0.1 / experiment.params.batch_size)
+		self.steps_per_epoch 	= math.ceil(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
 
 		self.input_shape = (len(self.stream.peek()[0]),)
 
@@ -259,7 +260,7 @@ class DatasetHelpers(object):
 		return t
 
 	@staticmethod
-	def review_from_all_hidden_patch_rnn(experiment):
+	def review_from_all_hidden_ntm(experiment):
 
 		encode_label = {
 			"PERSON":  [0,1,0,0],
@@ -286,8 +287,6 @@ class DatasetHelpers(object):
 			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
 
-			# logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
-
 			label = extract_label(l)
 			score = n.properties.get("score", -1.0)
 
@@ -300,20 +299,19 @@ class DatasetHelpers(object):
 			return package_node(i[0], i[1])
 
 		def t(row):
+			patch_size = experiment.header.params["patch_size"]
 
-			if experiment.header.params["patch_size"] > 1:
-				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.params["patch_size"]-1)
-			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
+			x = np.array([package_node(i, i.labels, (1.0 if n==0 else 0.0), n==0) for n, i in enumerate(row["g"].nodes[:patch_size])])
 
-			if experiment.header.params["patch_size"] > 1:
-				x = np.concatenate([[h], n])
-			else:
-				x = np.array([h])
+			# pad out if too small
+			delta = patch_size - x.shape[0]
+			if delta > 0:
+				x = np.pad(x, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
 
-			assert x.shape == (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
+			target_shape = (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
+			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
 
-			return Point(x, [row["node"].properties.get("score", -1.0)])
+			return Point(x, [row["g"].nodes[0].properties.get("score", -1.0)])
 
 		return t
 
