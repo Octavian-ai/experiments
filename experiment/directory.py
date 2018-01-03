@@ -179,20 +179,20 @@ directory = {
 		"""
 			MATCH g=(node:REVIEW {dataset_name:{dataset_name}}) -[*5]- (otherNode)
 			RETURN g
-			LIMIT 50000
+			LIMIT 500000
 		""",
 		"Special",
 		{
 			"target_dropout": 0.0,
-			"sequence_size": 20,
+			"sequence_size": 2,
 			"memory_size": 1000,
 			"word_size": 4,
 			"patch_width": 1006,
 			"patch_size": 6,
 			"node_control_width": 10,
 			"epochs": 20,
-			"repeat_batch": 1,
-			"use_memory": False,
+			"repeat_batch": 10,
+			"use_memory": True,
 			"working_width": 128,
 		}
 	),

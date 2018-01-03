@@ -26,6 +26,10 @@ class Experiment(object):
 	def run(cls):
 
 		params = Arguments.parse()
+		
+		if params.verbose > 0:
+			coloredlogs.install(level='INFO')
+
 		experiment = Experiment(params.experiment, directory[params.experiment], params)
 
 		print(Fore.GREEN)
@@ -34,15 +38,12 @@ class Experiment(object):
 		print("#######################################################################")
 		print(Style.RESET_ALL)
 
-		if params.verbose > 0:
-			coloredlogs.install(level='INFO')
-
 		dataset = Dataset.get(experiment)
 		score = Train.run(experiment, dataset)
 
 		print(Fore.YELLOW)
 		print("#######################################################################")
-		print("Experiment results:")
+		print("Experiment results\a")
 		print(f"{experiment.name} test loss {score[0]}")
 		print(f"{experiment.name} test accuracy {score[1]}")
 		print("#######################################################################")

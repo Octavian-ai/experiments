@@ -132,13 +132,12 @@ class PatchNTM(NTMBase):
 
 		patch = Input((self.patch_size, self.patch_width), name="InputPatch")
 		memory_tm1 = Input(batch_shape=self.memory_shape_batch, name="Memory")
-
 		memory_t = memory_tm1
 
-
 		# conv = self.combine_nodes(patch, working_width)
-		flat_patch = Reshape([self.patch_size*self.patch_width])(patch)
 		# first_node = Lambda(lambda x: x[:,:self.patch_data_width])(flat_patch)
+		patch_without_memory_addr = Lambda(lambda x: x[:,:,:self.patch_data_width:])(patch)
+		flat_patch = Reshape([self.patch_size*self.patch_data_width])(patch_without_memory_addr)
 		# working_memory = concatenate([first_node, conv])
 		working_memory = Dense(self.working_width, activation='tanh')(flat_patch)
 
