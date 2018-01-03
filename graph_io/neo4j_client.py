@@ -4,6 +4,8 @@ from config import config
 from lazy import lazy
 from multiprocessing import Queue, Lock
 from multiprocessing.pool import ThreadPool
+from more_itertools import chunked
+import uuid
 
 class NodeClient(object):
     class_singleton = None
@@ -25,9 +27,34 @@ class NodeClient(object):
         for x in self._session.run(cypher.value, **query_params.cypher_query_parameters):
             yield x
 
+    def execute_cypher_once_per_id(self, cypher: CypherQuery, query_params: QueryParams, dataset_name, batch_size=64):
+        # TODO: If you use this for writes then bad things can happen
+        for node_ids in chunked(self.get_node_ids(dataset_name), batch_size):
+
+            def read_tx(tx):
+                queries = []
+                for node_id in node_ids:
+                    temp_query_params = QueryParams(id=node_id)
+                    temp_query_params.update(query_params)
+                    queries.append(tx.run(cypher.value, **temp_query_params.cypher_query_parameters))
+
+                results = []
+                for query in queries:
+                    for x in query:
+                        results.append(x)
+                return results
+
+            for x in self._session.read_transaction(read_tx):
+                yield x
+
     def run(self, cypher: CypherQuery, query_params: QueryParams):
         # TODO: If you use this for writes then bad things can happen
         return self._session.run(cypher.value, **query_params.cypher_query_parameters)
+
+    def get_node_ids(self, dataset_name):
+        get_node_cypher = CypherQuery("MATCH (n:NODE {dataset_name:{dataset_name}}) RETURN n.id")
+        for n in self.run(get_node_cypher, QueryParams(dataset_name=dataset_name)):
+            yield uuid.UUID(n.value())
 
     def add_to_batch(self, cypher: CypherQuery, query_params: QueryParams):
         if not self.in_flight and not self.batch.empty():
