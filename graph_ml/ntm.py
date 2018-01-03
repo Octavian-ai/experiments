@@ -128,8 +128,6 @@ class PatchNTM(NTMBase):
 
 	def build(self):
 
-		working_width = 128
-
 		patch = Input((self.patch_size, self.patch_width), name="InputPatch")
 		memory_tm1 = Input(batch_shape=self.memory_shape_batch, name="Memory")
 		memory_t = memory_tm1
@@ -151,13 +149,13 @@ class PatchNTM(NTMBase):
 			working_memory = Lambda(lambda x: K.reshape(x, [self.batch_size, self.working_width]))(working_memory)
 			working_memory = concatenate([working_memory, read1], batch_size=self.batch_size)
 			
-			working_memory = Dense(working_width, activation='tanh')(working_memory)
+			working_memory = Dense(self.working_width, activation='tanh')(working_memory)
 
-			erase_word = Dense(self.word_size, name="DenseEraseWord")(working_memory)
+			erase_word = Dense(self.word_size, name="DenseEraseWord", activation='tanh')(working_memory)
 			address = self.generate_address(working_memory, patch, name="address_erase")
 			memory_t = self.erase(memory_t, address, erase_word)
 		
-			write_word = Dense(self.word_size, name="DenseWriteWord")(working_memory)
+			write_word = Dense(self.word_size, name="DenseWriteWord", activation='tanh')(working_memory)
 			address = self.generate_address(working_memory, patch, name="address_write")
 			memory_t = self.write(memory_t, address, write_word)
 

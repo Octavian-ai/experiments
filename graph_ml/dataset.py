@@ -157,9 +157,16 @@ class Dataset(object):
 		def chunk(it, length):
 			chunky = more_itertools.chunked(it, length)
 			for i in chunky:
-					xs = np.array([j[0] for j in i])
-					ys = np.array([j[1] for j in i])
-					yield (xs, ys)
+				xs = np.array([j[0] for j in i])
+				ys = np.array([j[1] for j in i])
+				yield (xs, ys)
+
+		def repeat(it, length):
+			for i in it:
+				# TODO: np.repeat or similar
+				xs = np.array([i[0] for j in range(length)])
+				ys = np.array([i[1] for j in range(length)])
+				yield (xs, ys)
 
 		def chunk_key(it, length, keys):
 			chunky = more_itertools.chunked(it, length)
@@ -176,19 +183,17 @@ class Dataset(object):
 		bs = experiment.params.batch_size
 		ss = experiment.header.params["sequence_size"]
 
-		def chunk_chunk(it, keys=None):
+		def chunk_chunk(it):
 			return chunk(chunk(it, ss), bs)
 
-		def chunk_chunk_key(it, key):
-			return chunk_key(chunk_key(it, ss, key), bs, key)
+		def chunk_repeat(it):
+			return chunk(repeat(it, ss), bs)
 
-		keys = ["neighbor", "node"]
+		self.train_generator 		= peekable(chunk_repeat(just("train")))
+		self.validation_generator 	= peekable(chunk_repeat(just("validate")))
+		self.test_generator 		= chunk_repeat(just("test"))
 
-		self.train_generator 		= peekable(chunk_chunk(just("train"), keys))
-		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
-		self.test_generator 		= chunk_chunk(just("test"), keys)
-
-		# logger.info(f"First training item: {self.train_generator.peek()}")
+		logger.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
