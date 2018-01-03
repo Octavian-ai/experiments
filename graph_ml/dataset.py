@@ -188,7 +188,7 @@ class Dataset(object):
 		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
 		self.test_generator 		= chunk_chunk(just("test"), keys)
 
-		logger.info(f"First training item: {self.train_generator.peek()}")
+		# logger.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
@@ -303,14 +303,9 @@ class DatasetHelpers(object):
 			if random.random() < experiment.header.params["target_dropout"] or hide_score:
 				score = -1.0
 
-			# if experiment.header.params["use_memory"]:
 			x = np.concatenate(([is_head, score], label, address_one_hot))
-			# else:
-				# x = np.concatenate(([is_head, score], label))
-
+			
 			return x
-
-		y_count = Counter()
 
 		def row_to_point(row):
 			patch_size = experiment.header.params["patch_size"]
@@ -325,7 +320,7 @@ class DatasetHelpers(object):
 			y = row["g"].nodes[0].properties.get("score", -1.0)
 			label = row["g"].nodes[0].labels
 
-			y_count[str(label) + '-' + str(y)] += 1
+			
 
 			target_shape = (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
 			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
@@ -337,7 +332,6 @@ class DatasetHelpers(object):
 			seen_nodes = set()
 
 			for row in stream:
-
 				nodes = set([i.id for i in row["g"].nodes])
 
 				if seen_nodes.isdisjoint(nodes):
@@ -348,11 +342,20 @@ class DatasetHelpers(object):
 
 
 		def transform(stream):
-			y_count.update(Counter())
-			for row in stream: # without_dupes(stream):
-				yield row_to_point(row)
+			y_count = Counter()
 
-			print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
+			# ugh arch pain
+			all_pts = list((row_to_point(row) for row in stream))
+
+			ones  = (i for i in all_pts if i.y[0] == 1.0)
+			zeros = (i for i in all_pts if i.y[0] == 0.0)
+
+			for i in zip(ones, zeros):
+				yield i[0]
+				yield i[1]
+
+			# y_count[str(y)] += 1
+			# print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
 			
 		return Recipe(transform=transform)
 

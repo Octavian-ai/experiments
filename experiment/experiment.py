@@ -49,5 +49,5 @@ class Experiment(object):
 		print("#######################################################################")
 		print(Style.RESET_ALL)
 
-		os.system(f"say test accuracy {score[1]}")
+		os.system(f"say test accuracy {round(score[1]*100)} percent")
 		
