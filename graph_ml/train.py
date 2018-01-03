@@ -2,6 +2,8 @@
 import os.path
 from datetime import datetime
 import logging
+from sklearn.metrics import classification_report
+import itertools
 
 import keras
 import numpy as np
@@ -10,6 +12,8 @@ import keras.callbacks
 from .model import Model
 from .dataset import Dataset
 from .path import generate_output_path
+
+logger = logging.getLogger(__name__)
 
 class StopEarlyIfAbove(keras.callbacks.Callback):
 	def __init__(self, monitor='val_acc', value=0.99, verbose=0, patience=3):
@@ -23,7 +27,7 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 	def on_epoch_end(self, epoch, logs={}):
 		current = logs.get(self.monitor)
 		if current is None:
-			print("Early stopping requires %s available!" % self.monitor)
+			logger.error("Early stopping requires %s available!" % self.monitor)
 			exit()
 
 		if current > self.value:
@@ -34,7 +38,7 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 
 	def on_train_end(self, logs=None):
 		if self.stopped_epoch > 0 and self.verbose > 0:
-			print("Epoch {}: early stopping {} > {}\a".format(self.stopped_epoch+1, self.monitor, self.value))
+			logger.info("Epoch {}: early stopping {} > {}".format(self.stopped_epoch+1, self.monitor, self.value))
 
 
 class TraceCallback(keras.callbacks.Callback):
@@ -42,19 +46,19 @@ class TraceCallback(keras.callbacks.Callback):
 		super(keras.callbacks.Callback, self).__init__()
 
 	def on_epoch_start(self, epoch, logs={}):
-		logging.info(f"Epoch {epoch} start")
+		logger.info(f"Epoch {epoch} start")
 
 	def on_epoch_end(self, epoch, logs={}):
-		logging.info("Epoch end")
+		logger.info("Epoch end")
 
 	def on_train_end(self, logs=None):
-		logging.info("Train end")
+		logger.info("Train end")
 
 	# def on_batch_end(self, batch_index, logs):
-	# 	logging.info("Batch end")
+	# 	logger.info("Batch end")
 
 	# def on_batch_begin(self, batch_index, logs):
-	# 	logging.info("Batch begin " + batch_index)
+	# 	logger.info("Batch begin " + batch_index)
 		
 
 
@@ -68,7 +72,7 @@ class Train(object):
 		if params.random_seed is not None:
 			np.random.seed(params.random_seed)
 
-		logging.info("Generate model")
+		logger.info("Generate model")
 
 		model = Model.generate(experiment, dataset)
 		params_file = generate_output_path(experiment, ".hdf5")
@@ -107,7 +111,7 @@ class Train(object):
 			callbacks=callbacks
 		)
 
-		logging.info("Evaluate model")
+		logger.info("Evaluate model")
 
 		score = model.evaluate_generator(
 			generator=dataset.test_generator,
@@ -115,6 +119,22 @@ class Train(object):
 			workers=0,
 			use_multiprocessing=False,
 		)
+
+		generate_classification_report = False
+		if generate_classification_report:
+			data_test = list(itertools.islice(dataset.test_generator, dataset.test_steps))
+			y_test = [i[1] for i in data_test]
+
+			y_pred = model.predict_generator(
+				generator=dataset.test_generator,
+				steps=dataset.test_steps,
+				workers=0,
+				use_multiprocessing=False,
+			)
+			y_pred = list(y_pred)
+			# TODO: I need to de-sequence the data to make this work
+			print(classification_report(y_test, y_pred))
+			
 
 		if params.verbose > 1: # and score[1] < 1.0
 			for layer in model.layers:

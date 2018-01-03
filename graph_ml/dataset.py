@@ -1,11 +1,12 @@
 
-import collections
+from collections import Counter
 import random
 import pickle
 import os.path
 import hashlib
 import neo4j
-from typing import Callable
+import math
+from typing import Callable, Generator
 import logging
 import itertools
 from itertools import cycle
@@ -17,9 +18,10 @@ import numpy as np
 from keras.preprocessing import text
 from keras.utils import np_utils
 
-from .path import generate_output_path
+from .path import generate_output_path, generate_data_path
 from graph_io import *
 
+logger = logging.getLogger(__name__)
 
 
 class Point(object):
@@ -39,10 +41,25 @@ class Point(object):
 		return self.__str__()
 
 
+def noop():
+	pass
+
 class Recipe:
-	def __init__(self, split:Callable[[neo4j.v1.Record], Point], finalize_x=lambda x:x):
-		self.split = split
-		self.finalize_x = finalize_x
+	def __init__(self, 
+		transform=Generator[neo4j.v1.Record,None,Point], 
+		split:Callable[[neo4j.v1.Record], Point]=None, 
+		finalize_x=None):
+
+		self.transform = transform
+
+		# TODO: migrate older experiments
+		if transform is None:
+			def legacy_transform(rows):
+				for i in rows:
+					p = split(i)
+					p.x = finalize_x(p.x)
+					yield p
+			self.transform = legacy_transform
 
 
 class Dataset(object):
@@ -55,24 +72,22 @@ class Dataset(object):
 		
 		recipes = {
 			'review_from_visible_style': Recipe(
-				lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
+				split=lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
 			),
 			'review_from_hidden_style_neighbor_conv': Recipe(
-				DatasetHelpers.review_from_hidden_style_neighbor_conv(100),
-				lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
+				split=DatasetHelpers.review_from_hidden_style_neighbor_conv(100),
+				finalize_x=lambda x: {'person':np.array([i['person'] for i in x]), 'neighbors': np.array([i['neighbors'] for i in x])}
 			),
 			'style_from_neighbor_conv': Recipe(
-				DatasetHelpers.style_from_neighbor(100)
+				split=DatasetHelpers.style_from_neighbor(100)
 			),
 			'style_from_neighbor_rnn': Recipe(
-				DatasetHelpers.style_from_neighbor(100)
+				split=DatasetHelpers.style_from_neighbor(100)
 			),
 			'review_from_all_hidden_simple_unroll': Recipe(
-				DatasetHelpers.review_from_all_hidden(experiment)
+				split=DatasetHelpers.review_from_all_hidden(experiment)
 			),
-			'review_from_all_hidden_patch_rnn': Recipe(
-				DatasetHelpers.review_from_all_hidden_patch_rnn(experiment)
-			)
+			'review_from_all_hidden_ntm': DatasetHelpers.review_from_all_hidden_ntm(experiment)
 		}
 
 		return Dataset(experiment, recipes[experiment.name])
@@ -95,32 +110,33 @@ class Dataset(object):
 
 		query_params.update(experiment.header.params)
 
-		dataset_file = generate_output_path(experiment, '.pkl')
+		dataset_file = generate_data_path(experiment, '.pkl')
+		logger.info(f"Dataset file {dataset_file}")
 
 		if os.path.isfile(dataset_file) and experiment.params.lazy:
-			logging.info(f"Opening dataset pickle {dataset_file}")
+			logger.info(f"Opening dataset pickle {dataset_file}")
 			data = pickle.load(open(dataset_file, "rb"))
 
 		else:
-			logging.info("Querying data from database")
+			logger.info("Querying data from database")
 			with SimpleNodeClient() as client:
 				data = client.run(CypherQuery(experiment.header.cypher_query), query_params).data()
 			pickle.dump(data, open(dataset_file, "wb"))
 
-		# Because we run through the data every epoch, and for test and validate and train
-		# and because we need to know the steps_per_epoch for Keras
-		# the data is in memory for now - sorry brah
+		# We need to know total length of data, so for ease I've listed it here.
+		# I've used generators everywhere, so if it wasn't for Keras, this would
+		# be memory efficient
+		
+		logger.info(f"Rows returned by Neo4j {len(data)}")
+		data = list(recipe.transform(data))
+		total_data = len(data)
+		logger.info(f"Number of rows of data: {total_data}")
 
-		# But all the downstream is legit generators!
-
-		def generate_all():
-			c = 0
+		def generate_partitions():
 			while True:
+				c = 0
 				random.shuffle(data)
 				for i in data:
-
-					p = recipe.split(i)
-					p.x = recipe.finalize_x(p.x)
 					
 					if c == 9:
 						l = "test"
@@ -131,14 +147,9 @@ class Dataset(object):
 
 					c = (c + 1) % 10
 
-					yield (l, p)
+					yield (l, i)
 
-		# It seems like Neo4J cannot tell us number of records to expect
-		# without us fetching them ALL :(
-		total_data = len(data)
-		logging.info(f"Total number of data {total_data}")
-
-		self.stream = peekable(generate_all())
+		self.stream = peekable(generate_partitions())
 
 		def just(tag):
 			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
@@ -177,12 +188,12 @@ class Dataset(object):
 		self.validation_generator 	= peekable(chunk_chunk(just("validate"), keys))
 		self.test_generator 		= chunk_chunk(just("test"), keys)
 
-		# logging.info(f"First training item: {self.train_generator.peek()}")
+		logger.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
-		self.validation_steps 	= int(total_data * 0.1 / experiment.params.batch_size)
-		self.test_steps 		= int(total_data * 0.1 / experiment.params.batch_size)
-		self.steps_per_epoch 	= int(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
+		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
+		self.test_steps 		= math.ceil(total_data * 0.1 / experiment.params.batch_size)
+		self.steps_per_epoch 	= math.ceil(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
 
 		self.input_shape = (len(self.stream.peek()[0]),)
 
@@ -259,7 +270,7 @@ class DatasetHelpers(object):
 		return t
 
 	@staticmethod
-	def review_from_all_hidden_patch_rnn(experiment):
+	def review_from_all_hidden_ntm(experiment):
 
 		encode_label = {
 			"PERSON":  [0,1,0,0],
@@ -286,36 +297,64 @@ class DatasetHelpers(object):
 			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
 
-			# logging.info(f"Memory space congestion: {len(node_id_dict) / ms}")
-
 			label = extract_label(l)
 			score = n.properties.get("score", -1.0)
 
 			if random.random() < experiment.header.params["target_dropout"] or hide_score:
 				score = -1.0
 
-			return np.concatenate(([is_head, score], label, address_one_hot))
+			# if experiment.header.params["use_memory"]:
+			x = np.concatenate(([is_head, score], label, address_one_hot))
+			# else:
+				# x = np.concatenate(([is_head, score], label))
 
-		def path_map(i):
-			return package_node(i[0], i[1])
+			return x
 
-		def t(row):
+		y_count = Counter()
 
-			if experiment.header.params["patch_size"] > 1:
-				n = DatasetHelpers.collect_neighbors(row, 'neighbors', path_map, experiment.header.params["patch_size"]-1)
+		def row_to_point(row):
+			patch_size = experiment.header.params["patch_size"]
+
+			x = np.array([package_node(i, i.labels, (1.0 if n==0 else 0.0), n==0) for n, i in enumerate(row["g"].nodes[:patch_size])])
+
+			# pad out if too small
+			delta = patch_size - x.shape[0]
+			if delta > 0:
+				x = np.pad(x, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+
+			y = row["g"].nodes[0].properties.get("score", -1.0)
+			label = row["g"].nodes[0].labels
+
+			y_count[str(label) + '-' + str(y)] += 1
+
+			target_shape = (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
+			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
+
+			return Point(x, [y])
+
+
+		def without_dupes(stream):
+			seen_nodes = set()
+
+			for row in stream:
+
+				nodes = set([i.id for i in row["g"].nodes])
+
+				if seen_nodes.isdisjoint(nodes):
+					seen_nodes.update(nodes)
+					yield row
+
+			# print(f"I saw nodes {seen_nodes}")
+
+
+		def transform(stream):
+			y_count.update(Counter())
+			for row in stream: # without_dupes(stream):
+				yield row_to_point(row)
+
+			print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
 			
-			h = np.concatenate(([1],package_node(row["node"], row["labels(node)"], is_head=1.0, hide_score=True)))
-
-			if experiment.header.params["patch_size"] > 1:
-				x = np.concatenate([[h], n])
-			else:
-				x = np.array([h])
-
-			assert x.shape == (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
-
-			return Point(x, [row["node"].properties.get("score", -1.0)])
-
-		return t
+		return Recipe(transform=transform)
 
 
 

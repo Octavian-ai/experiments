@@ -27,11 +27,12 @@ class NTMBase(object):
 		self.memory_shape = [self.memory_size, self.word_size]
 		self.memory_shape_batch = [self.batch_size] + self.memory_shape
 
+		self.patch_data_width = self.patch_width - self.memory_size
+		self.working_width = experiment.header.params["working_width"]
+
 
 	def combine_nodes(self, patch, width):
-		patch_data_width = self.patch_width - self.memory_size
-
-		patch_data = Lambda(lambda x: x[:,:,0:patch_data_width:])(patch)
+		patch_data = Lambda(lambda x: x[:,:,0:self.patch_data_width:])(patch)
 
 		n1 = Conv1D(
 			filters=width, 
@@ -131,41 +132,42 @@ class PatchNTM(NTMBase):
 
 		patch = Input((self.patch_size, self.patch_width), name="InputPatch")
 		memory_tm1 = Input(batch_shape=self.memory_shape_batch, name="Memory")
-
 		memory_t = memory_tm1
 
-		conv = self.combine_nodes(patch, working_width)
-		flat_patch = Reshape([self.patch_size*self.patch_width])(patch)
-		first_node = Lambda(lambda x: x[:self.patch_width])(flat_patch)
+		# conv = self.combine_nodes(patch, working_width)
+		# first_node = Lambda(lambda x: x[:,:self.patch_data_width])(flat_patch)
+		patch_without_memory_addr = Lambda(lambda x: x[:,:,:self.patch_data_width:])(patch)
+		flat_patch = Reshape([self.patch_size*self.patch_data_width])(patch_without_memory_addr)
+		# working_memory = concatenate([first_node, conv])
+		working_memory = Dense(self.working_width, activation='tanh')(flat_patch)
 
-		working_memory = concatenate([first_node, conv])
 
-		# ------- Memory operations --------- #
+		if self.experiment.header.params["use_memory"]:
+			# ------- Memory operations --------- #
+			address = self.generate_address(working_memory, patch, name="address_read1")
+			read1 = self.read(memory_t, address)
 
-		address = self.generate_address(working_memory, patch, name="address_read")
-		read = self.read(memory_t, address)
+			# Turn batch dimension from None to batch_size
+			working_memory = Lambda(lambda x: K.reshape(x, [self.batch_size, self.working_width]))(working_memory)
+			working_memory = concatenate([working_memory, read1], batch_size=self.batch_size)
+			
+			working_memory = Dense(working_width, activation='tanh')(working_memory)
 
-		# I want to read, and add that to working memory
-		# read = Reshape([self.word_size])(read)
-		# working_memory = concatenate([working_memory, read], batch_size=self.batch_size)
-		working_memory = Dense(working_width,activation='tanh')(working_memory)
+			erase_word = Dense(self.word_size, name="DenseEraseWord")(working_memory)
+			address = self.generate_address(working_memory, patch, name="address_erase")
+			memory_t = self.erase(memory_t, address, erase_word)
+		
+			write_word = Dense(self.word_size, name="DenseWriteWord")(working_memory)
+			address = self.generate_address(working_memory, patch, name="address_write")
+			memory_t = self.write(memory_t, address, write_word)
 
-		erase_word = Dense(self.word_size, name="DenseEraseWord")(working_memory)
-		address = self.generate_address(working_memory, patch, name="address_erase")
-		memory_t = self.erase(memory_t, address, erase_word)
-	
-		write_word = Dense(self.word_size, name="DenseWriteWord")(working_memory)
-		address = self.generate_address(working_memory, patch, name="address_write")
-		memory_t = self.write(memory_t, address, write_word)
+			address = self.generate_address(working_memory, patch, name="address_read2")
+			read2 = self.read(memory_t, address)
 
-		# Read after so it can loopback in a single step if it wants
-		address = self.generate_address(working_memory, patch, name="address_read")
-		read2 = self.read(memory_t, address)
+			working_memory = concatenate([working_memory, read2])
 
-		# I'd like to use working memory and the read to drive the output
-		# working_memory = concatenate([working_memory, read2])
-		# working_memory = Lambda(lambda x: K.concatenate([x, read2]))(working_memory)
-		out = Dense(1)(read2)
+
+		out = Dense(1)(working_memory)
 
 		return RecurrentModel(
 			input=patch,
