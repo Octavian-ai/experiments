@@ -1,5 +1,5 @@
 
-import collections
+from collections import Counter
 import random
 import pickle
 import os.path
@@ -278,8 +278,6 @@ class DatasetHelpers(object):
 			"PRODUCT": [0,0,0,1]
 		}
 
-		y_count = collections.Counter()
-
 		def extract_label(l):
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
 
@@ -311,6 +309,8 @@ class DatasetHelpers(object):
 				# x = np.concatenate(([is_head, score], label))
 
 			return x
+
+		y_count = Counter()
 
 		def row_to_point(row):
 			patch_size = experiment.header.params["patch_size"]
@@ -348,11 +348,11 @@ class DatasetHelpers(object):
 
 
 		def transform(stream):
-			y_count.update(collections.Counter())
+			y_count.update(Counter())
 			for row in stream: # without_dupes(stream):
 				yield row_to_point(row)
-			print("Counter of y values:", y_count)
 
+			print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
 			
 		return Recipe(transform=transform)
 
