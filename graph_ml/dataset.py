@@ -46,9 +46,9 @@ def noop():
 
 class Recipe:
 	def __init__(self, 
-		transform:Callable[[Generator[neo4j.v1.Record, None, None]], Generator[Point, None, None]] = None, 
+		transform:Callable[[Generator[neo4j.v1.Record, None, None]], Generator[Point, None, None]] = None,
 		query:Callable[[], Generator[neo4j.v1.Record, None, None]] = None,
-		split:Callable[[neo4j.v1.Record], Point] = None, 
+		split:Callable[[neo4j.v1.Record], Point] = None,
 		finalize_x = None):
 
 		self.transform = transform
@@ -110,7 +110,7 @@ class Dataset(object):
 		self.recipe = recipe
 
 		if experiment.params.random_seed is not None:
-			random.seed(params.random_seed)
+			random.seed(experiment.params.random_seed)
 
 		query_params = QueryParams(
 			golden=experiment.params.golden, 
@@ -322,7 +322,7 @@ class DatasetHelpers(object):
 				score = -1.0
 
 			x = np.concatenate(([is_head, score], label, address_one_hot))
-			
+
 			return x
 
 		def ensure_length(arr, length):
@@ -387,7 +387,7 @@ class DatasetHelpers(object):
 
 			# y_count[str(y)] += 1
 			# print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
-			
+
 		return Recipe(transform=transform,query=query)
 
 
@@ -395,7 +395,7 @@ class DatasetHelpers(object):
 
 
 
-	
+
 
 
 
