@@ -46,9 +46,9 @@ def noop():
 
 class Recipe:
 	def __init__(self, 
-		transform:Callable[[Generator[neo4j.v1.Record, None, None]], Generator[Point, None, None]] = None, 
+		transform:Callable[[Generator[neo4j.v1.Record, None, None]], Generator[Point, None, None]] = None,
 		query:Callable[[], Generator[neo4j.v1.Record, None, None]] = None,
-		split:Callable[[neo4j.v1.Record], Point] = None, 
+		split:Callable[[neo4j.v1.Record], Point] = None,
 		finalize_x = None):
 
 		self.transform = transform
@@ -59,7 +59,7 @@ class Recipe:
 			def legacy_transform(rows):
 				for i in rows:
 					p = split(i)
-					p.x = finalize_x(p.x)
+					p.x = finalize_x(p.x) if finalize_x else p.x
 					yield p
 			self.transform = legacy_transform
 
@@ -110,7 +110,7 @@ class Dataset(object):
 		self.recipe = recipe
 
 		if experiment.params.random_seed is not None:
-			random.seed(params.random_seed)
+			random.seed(experiment.params.random_seed)
 
 		query_params = QueryParams(
 			golden=experiment.params.golden, 
@@ -146,9 +146,9 @@ class Dataset(object):
 		logger.info(f"Number of rows of data: {total_data}")
 
 		def generate_partitions():
+			random.shuffle(data)
 			while True:
 				c = 0
-				random.shuffle(data)
 				for i in data:
 					
 					if c == 9:
@@ -162,10 +162,10 @@ class Dataset(object):
 
 					yield (l, i)
 
-		self.stream = peekable(generate_partitions())
+		stream = generate_partitions()
 
 		def just(tag):
-			return ( (i[1].x, i[1].y) for i in self.stream if i[0] == tag)
+			return ( (i[1].x, i[1].y) for i in stream if i[0] == tag)
 
 		def chunk(it, length):
 			chunky = more_itertools.chunked(it, length)
@@ -174,33 +174,9 @@ class Dataset(object):
 				ys = np.array([j[1] for j in i])
 				yield (xs, ys)
 
-		def repeat(it, length):
-			for i in it:
-				# TODO: np.repeat or similar
-				xs = np.array([i[0] for j in range(length)])
-				ys = np.array([i[1] for j in range(length)])
-				yield (xs, ys)
-
-		def chunk_key(it, length, keys):
-			chunky = more_itertools.chunked(it, length)
-
-			def c(k):
-				for i in chunky:
-					xs = np.array([j[0][k] for j in i])
-					ys = np.array([j[1] for j in i])
-					yield (xs, ys)
-
-			return {k: c(k) for k in keys}
-
 		
 		bs = experiment.params.batch_size
-		ss = experiment.header.params["sequence_size"]
 
-		def chunk_chunk(it):
-			return chunk(chunk(it, ss), bs)
-
-		def chunk_repeat(it):
-			return chunk(repeat(it, ss), bs)
 
 		self.train_generator 		= peekable(chunk(just("train"), bs))
 		self.validation_generator 	= peekable(chunk(just("validate"), bs))
@@ -213,7 +189,7 @@ class Dataset(object):
 		self.test_steps 		= math.ceil(total_data * 0.1 / experiment.params.batch_size)
 		self.steps_per_epoch 	= math.ceil(total_data * 0.8 / experiment.params.batch_size) * int(experiment.header.params.get('repeat_batch', 1))
 
-		self.input_shape = (len(self.stream.peek()[0]),)
+		self.input_shape = self.train_generator.peek()[0][0].shape
 
 
 class DatasetHelpers(object):
@@ -322,7 +298,7 @@ class DatasetHelpers(object):
 				score = -1.0
 
 			x = np.concatenate(([is_head, score], label, address_one_hot))
-			
+
 			return x
 
 		def ensure_length(arr, length):
@@ -391,7 +367,6 @@ class DatasetHelpers(object):
 			pts = (row_to_point(row) for row in stream)
 			return pts
 
-			
 		return Recipe(transform=transform,query=query)
 
 
@@ -399,7 +374,7 @@ class DatasetHelpers(object):
 
 
 
-	
+
 
 
 
