@@ -370,13 +370,10 @@ class DatasetHelpers(object):
 				id_type="REVIEW"
 			)
 
-
-		def transform(stream):
-			y_count = Counter()
-
+		def balance_classes(stream):
 			# ugh arch pain
 			# instead pass in an arg that is a callable stream generator
-			all_pts = list((row_to_point(row) for row in stream))
+			all_pts = list(stream)
 
 			ones  = (i for i in all_pts if i.y[0] == 1.0)
 			zeros = (i for i in all_pts if i.y[0] == 0.0)
@@ -385,8 +382,15 @@ class DatasetHelpers(object):
 				yield i[0]
 				yield i[1]
 
+			
+
+		def transform(stream):
+			# y_count = Counter()
 			# y_count[str(y)] += 1
 			# print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
+			pts = (row_to_point(row) for row in stream)
+			return pts
+
 			
 		return Recipe(transform=transform,query=query)
 
