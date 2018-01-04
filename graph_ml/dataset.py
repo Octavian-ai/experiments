@@ -101,7 +101,7 @@ class Dataset(object):
 		self.recipe = recipe
 
 		if experiment.params.random_seed is not None:
-			random.seed(params.random_seed)
+			random.seed(experiment.params.random_seed)
 
 		query_params = QueryParams(
 			golden=experiment.params.golden, 
@@ -120,6 +120,7 @@ class Dataset(object):
 		else:
 			logger.info("Querying data from database")
 			with SimpleNodeClient() as client:
+
 				data = client.run(CypherQuery(experiment.header.cypher_query), query_params).data()
 			pickle.dump(data, open(dataset_file, "wb"))
 
