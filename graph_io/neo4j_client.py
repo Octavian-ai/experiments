@@ -6,6 +6,7 @@ from multiprocessing import Queue, Lock
 from multiprocessing.pool import ThreadPool
 from more_itertools import chunked
 import uuid
+from tqdm import tqdm
 
 class NodeClient(object):
     class_singleton = None
@@ -27,9 +28,10 @@ class NodeClient(object):
         for x in self._session.run(cypher.value, **query_params.cypher_query_parameters):
             yield x
 
-    def execute_cypher_once_per_id(self, cypher: CypherQuery, query_params: QueryParams, dataset_name, batch_size=64):
+    def execute_cypher_once_per_id(self, cypher: CypherQuery, query_params: QueryParams, dataset_name, batch_size=2048, id_limit=None, id_type="Node"):
         # TODO: If you use this for writes then bad things can happen
-        for node_ids in chunked(self.get_node_ids(dataset_name), batch_size):
+        total = id_limit/batch_size if id_limit is not None else None
+        for node_ids in tqdm(chunked(self.get_node_ids(dataset_name, id_limit, id_type), batch_size), total=total):
 
             def read_tx(tx):
                 queries = []
@@ -51,8 +53,9 @@ class NodeClient(object):
         # TODO: If you use this for writes then bad things can happen
         return self._session.run(cypher.value, **query_params.cypher_query_parameters)
 
-    def get_node_ids(self, dataset_name):
-        get_node_cypher = CypherQuery("MATCH (n:NODE {dataset_name:{dataset_name}}) RETURN n.id")
+    def get_node_ids(self, dataset_name, limit=None, tpe="NODE"):
+        qy = "MATCH (n:" + tpe + " {dataset_name:{dataset_name}}) RETURN n.id" + (f" LIMIT {limit}" if limit is not None else "")
+        get_node_cypher = CypherQuery(qy)
         for n in self.run(get_node_cypher, QueryParams(dataset_name=dataset_name)):
             yield uuid.UUID(n.value())
 

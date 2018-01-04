@@ -177,22 +177,31 @@ directory = {
 		""",
 		EXPERIMENT_4_DATASET,
 		"""
-			MATCH g=(node:REVIEW {dataset_name:{dataset_name}}) -[*5]- (otherNode)
-			RETURN g
-			LIMIT 50000
+			MATCH p=
+				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
+					-[*5]-
+				(other)
+			WHERE review.id={id}
+			WITH
+				review,
+				COLLECT(p)[0..15] as neighbors
+			RETURN 
+				review,
+				neighbors
 		""",
 		"Special",
 		{
 			"target_dropout": 0.0,
-			"sequence_size": 10,
+			"sequence_size": 16,
 			"memory_size": 1000,
 			"word_size": 4,
 			"patch_width": 1006,
-			"patch_size": 6,
+			"patch_size": 7,
 			"epochs": 20,
 			"repeat_batch": 1,
 			"use_memory": True,
-			"working_width": 1024,
+			"working_width": 32,
+			"id_limit": 20000
 		}
 	),
 

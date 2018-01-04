@@ -28,7 +28,9 @@ class Experiment(object):
 		params = Arguments.parse()
 		
 		if params.verbose > 0:
-			coloredlogs.install(level='INFO')
+			coloredlogs.install(level='INFO', logger=logging.getLogger("experiment"))
+			coloredlogs.install(level='INFO', logger=logging.getLogger("graph_ml"))
+			coloredlogs.install(level='INFO', logger=logging.getLogger("graph_io"))
 
 		experiment = Experiment(params.experiment, directory[params.experiment], params)
 

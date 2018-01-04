@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dbfb159586ee3c1225ddf0a5700ddc9344fa676c8fefd97cf76b7772205a5754"
+            "sha256": "d5a32470e38a59d7f0d2a922eddd6ebef934461aeed7ef65298ee5c38856a021"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -123,10 +123,10 @@
         },
         "humanfriendly": {
             "hashes": [
-                "sha256:43a43575cc5c1506a50fb5a536757aa0c2ae94c0ec10572b368510c878fdc0b9",
-                "sha256:f1ebb406d37478228b92543c12c27c9a827782d8d241260b3a06512c7f7c3a5e"
+                "sha256:8573445ad8e2b84775a8f6bacef8f1c3761f97a016dc89289a286faa3243a973",
+                "sha256:833bd44237f302932dcbe8428704c486ce112fe7d954c3aebbd098b8ed4800d8"
             ],
-            "version": "==4.4.1"
+            "version": "==4.4.2"
         },
         "keras": {
             "hashes": [
@@ -347,6 +347,13 @@
                 "sha256:8a91de3f70dd24f986f51a660b12cbafb8be3c3ba5c9f56504dba4d9fb63acf3"
             ],
             "version": "==0.4.0rc3"
+        },
+        "tqdm": {
+            "hashes": [
+                "sha256:4c041f8019f7be65b8028ddde9a836f7ccc51c4637f1ff2ba9b5813d38d19d5a",
+                "sha256:df32e6f127dc0ccbc675eadb33f749abbcb8f174c5cb9ec49c0cdb73aa737377"
+            ],
+            "version": "==4.19.5"
         },
         "werkzeug": {
             "hashes": [

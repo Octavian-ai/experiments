@@ -46,11 +46,13 @@ def noop():
 
 class Recipe:
 	def __init__(self, 
-		transform=Generator[neo4j.v1.Record,None,Point], 
-		split:Callable[[neo4j.v1.Record], Point]=None, 
-		finalize_x=None):
+		transform:Callable[[Generator[neo4j.v1.Record, None, None]], Generator[Point, None, None]] = None, 
+		query:Callable[[], Generator[neo4j.v1.Record, None, None]] = None,
+		split:Callable[[neo4j.v1.Record], Point] = None, 
+		finalize_x = None):
 
 		self.transform = transform
+		self.query = query
 
 		# TODO: migrate older experiments
 		if transform is None:
@@ -60,6 +62,13 @@ class Recipe:
 					p.x = finalize_x(p.x)
 					yield p
 			self.transform = legacy_transform
+
+		if query is None:
+			def default_query(client, cypher_query, query_params):
+				return client.execute_cypher(cypher_query, query_params)
+
+			self.query = default_query
+
 
 
 class Dataset(object):
@@ -108,9 +117,9 @@ class Dataset(object):
 			dataset_name=experiment.header.dataset_name, 
 			experiment=experiment.name)
 
-		query_params.update(experiment.header.params)
+		query_params.update(QueryParams(**experiment.header.params))
 
-		dataset_file = generate_data_path(experiment, '.pkl')
+		dataset_file = generate_data_path(experiment, '.pkl', query_params)
 		logger.info(f"Dataset file {dataset_file}")
 
 		if os.path.isfile(dataset_file) and experiment.params.lazy:
@@ -120,7 +129,11 @@ class Dataset(object):
 		else:
 			logger.info("Querying data from database")
 			with SimpleNodeClient() as client:
-				data = client.run(CypherQuery(experiment.header.cypher_query), query_params).data()
+				cq = CypherQuery(experiment.header.cypher_query)
+				data = recipe.query(client, cq, query_params)
+
+				# Later shift to query-on-demand
+				data = list(data)
 			pickle.dump(data, open(dataset_file, "wb"))
 
 		# We need to know total length of data, so for ease I've listed it here.
@@ -189,11 +202,11 @@ class Dataset(object):
 		def chunk_repeat(it):
 			return chunk(repeat(it, ss), bs)
 
-		self.train_generator 		= peekable(chunk_repeat(just("train")))
-		self.validation_generator 	= peekable(chunk_repeat(just("validate")))
-		self.test_generator 		= chunk_repeat(just("test"))
+		self.train_generator 		= peekable(chunk(just("train"), bs))
+		self.validation_generator 	= peekable(chunk(just("validate"), bs))
+		self.test_generator 		= chunk(just("test"), bs)
 
-		logger.info(f"First training item: {self.train_generator.peek()}")
+		# logger.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
@@ -295,14 +308,14 @@ class DatasetHelpers(object):
 
 			return node_id_dict[nid]
 
-		def package_node(n, l, is_head=0.0, hide_score=False):
+		def package_node(n, is_head=0.0, hide_score=False):
 			ms = experiment.header.params['memory_size']
 
 			address_trunc = node_id_to_memory_addr(n.id)
 			address_one_hot = np.zeros(ms)
 			address_one_hot[address_trunc] = 1.0
 
-			label = extract_label(l)
+			label = extract_label(n.labels)
 			score = n.properties.get("score", -1.0)
 
 			if random.random() < experiment.header.params["target_dropout"] or hide_score:
@@ -312,44 +325,57 @@ class DatasetHelpers(object):
 			
 			return x
 
+		def ensure_length(arr, length):
+			delta = length - arr.shape[0]
+			if delta > 0:
+				pad_shape = ((0,delta),)
+				for i in range(len(arr.shape)-1):
+					pad_shape += ((0, 0),)
+				arr = np.pad(arr, pad_shape, 'constant', constant_values=0.0)
+
+			return arr
+
+
+		def path_to_patch(node, path):
+			n = package_node(node, is_head=1.0, hide_score=True)
+			ps = np.array([package_node(i) for i in path.nodes])
+
+			patch_size = experiment.header.params["patch_size"]
+			ps = ensure_length(ps, patch_size - 1)
+
+			return np.concatenate([[n], ps])
+
 		def row_to_point(row):
 			patch_size = experiment.header.params["patch_size"]
+			seq_size = experiment.header.params["sequence_size"]
 
-			x = np.array([package_node(i, i.labels, (1.0 if n==0 else 0.0), n==0) for n, i in enumerate(row["g"].nodes[:patch_size])])
+			review = row["review"]
+			x = np.array([path_to_patch(review, path) for path in row["neighbors"]])
+			x = ensure_length(x, seq_size)
 
-			# pad out if too small
-			delta = patch_size - x.shape[0]
-			if delta > 0:
-				x = np.pad(x, ((0,delta), (0, 0)), 'constant', constant_values=0.0)
+			y = row["review"].properties.get("score", -1.0)
+			y = np.expand_dims(np.repeat([y], seq_size), axis=-1)
 
-			y = row["g"].nodes[0].properties.get("score", -1.0)
-			label = row["g"].nodes[0].labels
-
-			
-
-			target_shape = (experiment.header.params["patch_size"], experiment.header.params["patch_width"])
+			target_shape = (seq_size, patch_size, experiment.header.params["patch_width"])
 			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
 
-			return Point(x, [y])
+			return Point(x, y)
 
-
-		def without_dupes(stream):
-			seen_nodes = set()
-
-			for row in stream:
-				nodes = set([i.id for i in row["g"].nodes])
-
-				if seen_nodes.isdisjoint(nodes):
-					seen_nodes.update(nodes)
-					yield row
-
-			# print(f"I saw nodes {seen_nodes}")
+		def query(client, cypher_query, query_params):
+			return client.execute_cypher_once_per_id(
+				cypher_query,
+				query_params,
+				dataset_name=experiment.header.dataset_name,
+				id_limit=experiment.header.params["id_limit"],
+				id_type="REVIEW"
+			)
 
 
 		def transform(stream):
 			y_count = Counter()
 
 			# ugh arch pain
+			# instead pass in an arg that is a callable stream generator
 			all_pts = list((row_to_point(row) for row in stream))
 
 			ones  = (i for i in all_pts if i.y[0] == 1.0)
@@ -362,7 +388,7 @@ class DatasetHelpers(object):
 			# y_count[str(y)] += 1
 			# print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
 			
-		return Recipe(transform=transform)
+		return Recipe(transform=transform,query=query)
 
 
 
