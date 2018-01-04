@@ -6,7 +6,7 @@ class QueryParams(object):
         self._params = kwargs
 
     def update(self,other):
-        self._params.update(other)
+        self._params.update(other._params)
 
     @property
     def query_string(self):
