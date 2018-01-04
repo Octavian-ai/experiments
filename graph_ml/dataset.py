@@ -177,12 +177,11 @@ class Dataset(object):
 		
 		bs = experiment.params.batch_size
 
-
 		self.train_generator 		= peekable(chunk(just("train"), bs))
 		self.validation_generator 	= peekable(chunk(just("validate"), bs))
 		self.test_generator 		= chunk(just("test"), bs)
 
-		# logger.info(f"First training item: {self.train_generator.peek()}")
+		logger.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)

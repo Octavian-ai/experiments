@@ -201,7 +201,7 @@ directory = {
 			"repeat_batch": 1,
 			"use_memory": True,
 			"working_width": 32,
-			"id_limit": 200
+			"id_limit": 200000
 		}
 	),
 

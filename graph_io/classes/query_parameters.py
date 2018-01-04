@@ -29,3 +29,9 @@ class QueryParams(object):
     @property
     def cypher_query_parameters(self):
         return {n: self.__extract_neo_value(p) for n,p in self._params.items()} if self._params else {}
+
+    def __str__(self):
+        return str(self._params)
+
+    def __repr__(self):
+        return self.__str__()
