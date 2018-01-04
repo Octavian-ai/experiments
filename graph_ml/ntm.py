@@ -139,8 +139,9 @@ class PatchNTM(NTMBase):
 		# working_memory = concatenate([first_node, conv])
 		working_memory = Dense(self.working_width, activation='tanh')(flat_patch)
 
+		use_memory = False
 
-		if False and self.experiment.header.params["use_memory"]:
+		if use_memory:
 			# ------- Memory operations --------- #
 			address = self.generate_address(working_memory, patch, name="address_read1")
 			read1 = self.read(memory_t, address)

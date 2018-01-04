@@ -199,7 +199,6 @@ directory = {
 			"patch_size": 7,
 			"epochs": 20,
 			"repeat_batch": 1,
-			"use_memory": True,
 			"working_width": 32,
 			"id_limit": 200000
 		}
