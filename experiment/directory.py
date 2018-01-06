@@ -190,7 +190,7 @@ directory = {
 			WHERE review.id={id}
 			WITH
 				review,
-				COLLECT(p)[0..100] as neighbors
+				COLLECT(p)[0..200] as neighbors
 			RETURN 
 				review,
 				neighbors
