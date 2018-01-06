@@ -96,7 +96,7 @@ class Dataset(object):
 			'review_from_all_hidden_simple_unroll': Recipe(
 				split=DatasetHelpers.review_from_all_hidden(experiment)
 			),
-			'review_from_all_hidden_ntm': DatasetHelpers.review_from_all_hidden_ntm(experiment)
+			'review_from_all_hidden_random_walks': DatasetHelpers.review_from_all_hidden_random_walks(experiment)
 		}
 
 		return Dataset(experiment, recipes[experiment.name])
@@ -119,7 +119,8 @@ class Dataset(object):
 
 		query_params.update(QueryParams(**experiment.header.params))
 
-		dataset_file = generate_data_path(experiment, '.pkl', query_params)
+		data_path_params = {i:query_params[i] for i in experiment.header.lazy_params}
+		dataset_file = generate_data_path(experiment, '.pkl', data_path_params)
 		logger.info(f"Dataset file {dataset_file}")
 
 		if os.path.isfile(dataset_file) and experiment.params.lazy:
@@ -181,7 +182,7 @@ class Dataset(object):
 		self.validation_generator 	= peekable(chunk(just("validate"), bs))
 		self.test_generator 		= chunk(just("test"), bs)
 
-		logger.info(f"First training item: {self.train_generator.peek()}")
+		# logger.info(f"First training item: {self.train_generator.peek()}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
@@ -263,7 +264,7 @@ class DatasetHelpers(object):
 		return t
 
 	@staticmethod
-	def review_from_all_hidden_ntm(experiment):
+	def review_from_all_hidden_random_walks(experiment):
 
 		encode_label = {
 			"PERSON":  [0,1,0,0],
@@ -283,7 +284,7 @@ class DatasetHelpers(object):
 
 			return node_id_dict[nid]
 
-		def package_node(n, is_head=0.0, hide_score=False):
+		def package_node(n, is_target=False):
 			ms = experiment.header.params['memory_size']
 
 			address_trunc = node_id_to_memory_addr(n.id)
@@ -293,10 +294,10 @@ class DatasetHelpers(object):
 			label = extract_label(n.labels)
 			score = n.properties.get("score", -1.0)
 
-			if random.random() < experiment.header.params["target_dropout"] or hide_score:
+			if random.random() < experiment.header.params["target_dropout"] or is_target:
 				score = -1.0
 
-			x = np.concatenate(([is_head, score], label, address_one_hot))
+			x = np.concatenate(([score, float(is_target)], label, address_one_hot))
 
 			return x
 
@@ -307,18 +308,18 @@ class DatasetHelpers(object):
 				for i in range(len(arr.shape)-1):
 					pad_shape += ((0, 0),)
 				arr = np.pad(arr, pad_shape, 'constant', constant_values=0.0)
+			elif delta < 0:
+				arr = arr[:length]
 
 			return arr
 
 
 		def path_to_patch(node, path):
-			n = package_node(node, is_head=1.0, hide_score=True)
-			ps = np.array([package_node(i) for i in path.nodes])
-
+			ps = np.array([package_node(i, i.id == node.id) for i in path.nodes])
 			patch_size = experiment.header.params["patch_size"]
-			ps = ensure_length(ps, patch_size - 1)
+			ps = ensure_length(ps, patch_size)
+			return ps
 
-			return np.concatenate([[n], ps])
 
 		def row_to_point(row):
 			patch_size = experiment.header.params["patch_size"]
@@ -329,7 +330,8 @@ class DatasetHelpers(object):
 			x = ensure_length(x, seq_size)
 
 			y = row["review"].properties.get("score", -1.0)
-			y = np.expand_dims(np.repeat([y], seq_size), axis=-1)
+			y = np.repeat([y], seq_size)
+			y = np.expand_dims(y, axis=-1)
 
 			target_shape = (seq_size, patch_size, experiment.header.params["patch_width"])
 			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
@@ -363,8 +365,9 @@ class DatasetHelpers(object):
 			# y_count = Counter()
 			# y_count[str(y)] += 1
 			# print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
-			pts = (row_to_point(row) for row in stream)
-			return pts
+			stream = (row_to_point(row) for row in stream)
+			stream = balance_classes(stream)
+			return stream
 
 		return Recipe(transform=transform,query=query)
 

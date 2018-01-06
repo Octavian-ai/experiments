@@ -102,35 +102,23 @@ class Model(object):
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
 
-		elif experiment.name == 'review_from_all_hidden_ntm':
+		elif experiment.name == 'review_from_all_hidden_random_walks':
 
 			ss = experiment.header.params["sequence_size"]
 			ps = experiment.header.params["patch_size"]
 			pw = experiment.header.params["patch_width"]
 			bs = experiment.params.batch_size
 
-			# https://stackoverflow.com/questions/42969779/keras-error-you-must-feed-a-value-for-placeholder-tensor-bidirectional-1-keras
-			# K.set_learning_phase(1) #set learning phase
-
-
-			# node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
-			# neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
 			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
-			flat_patch = Reshape([ss, ps*pw])(patch)
+			# flat_patch = Reshape([ss*ps*pw])(patch)
+			# score = Dense(experiment.header.params["working_width"]*2, activation="tanh")(flat_patch)
+			# score = Dense(experiment.header.params["working_width"],   activation="tanh")(flat_patch)
 
 			rnn = PatchNTM(experiment).build()
-			rnn_out = rnn(patch)
-
-			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)
-			# score = Lambda(lambda x: K.expand_dims(x, axis=-1), name="score_reshape")(score)
-
-			# assert score.shape == [bs, ss, 1], f"Score wrong shape, {score.shape}"
+			score = rnn(patch)
+			score = Dense(1, activation="sigmoid", name="score_dense")(score)	
 			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
-
-			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.SGD(lr=0.3),
-				metrics=['accuracy'])
 
 
 

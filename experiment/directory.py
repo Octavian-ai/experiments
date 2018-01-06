@@ -170,29 +170,35 @@ directory = {
 		}
 	),
 
-	"review_from_all_hidden_ntm": ExperimentHeader(
+	"review_from_all_hidden_random_walks": ExperimentHeader(
 		"""
 			Let's try to do a RNN that operates on pieces of the graph
+
+			Generate random walks, of this sort of shape:
+
+			(PERSON) --> (REVIEW) --> (PRODUCT) <-- (REVIEW) <-- (PERSON) --> (REVIEW) --> (PRODUCT)
 
 		""",
 		EXPERIMENT_4_DATASET,
 		"""
 			MATCH p=
+				(otherA) 
+					-[*3]-
 				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-					-[*5]-
-				(other)
+					-[*3]-
+				(otherB)
 			WHERE review.id={id}
 			WITH
 				review,
-				COLLECT(p)[0..15] as neighbors
+				COLLECT(p)[0..100] as neighbors
 			RETURN 
 				review,
 				neighbors
 		""",
-		"Special",
+		float,
 		{
 			"target_dropout": 0.0,
-			"sequence_size": 16,
+			"sequence_size": 100,
 			"memory_size": 1000,
 			"word_size": 4,
 			"patch_width": 1006,
@@ -200,8 +206,9 @@ directory = {
 			"epochs": 20,
 			"repeat_batch": 1,
 			"working_width": 32,
-			"id_limit": 200000
-		}
+			"id_limit": 200
+		}, 
+		["id_limit"]
 	),
 
 	"style_from_neighbor_conv": ExperimentHeader(
@@ -228,6 +235,6 @@ directory = {
 
 }
 
-default_experiment = "review_from_all_hidden_ntm"
+default_experiment = "review_from_all_hidden_random_walks"
 
 

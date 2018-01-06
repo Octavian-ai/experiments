@@ -30,6 +30,10 @@ class QueryParams(object):
     def cypher_query_parameters(self):
         return {n: self.__extract_neo_value(p) for n,p in self._params.items()} if self._params else {}
 
+    # All this wrapping seems boilerplate to David and he dislikes it
+    def __getitem__(self, index):
+        return self._params[index]
+
     def __str__(self):
         return str(self._params)
 
