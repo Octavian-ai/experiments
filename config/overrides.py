@@ -8,8 +8,10 @@ overrides.update(**{
         'neo4j_user': 'readonly',
         'neo4j_password': '0s3DGA6Zq'
     },
-    'floydhub': { # Todo: implement me?
-
+    'floyd': { # Todo: implement me?
+        'neo4j_url': 'bolt://796bafef-staging.databases.neo4j.io',
+        'neo4j_user': 'readonly',
+        'neo4j_password': '0s3DGA6Zq'
     },
     'local': { # Just uses defaults
 

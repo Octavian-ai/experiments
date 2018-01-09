@@ -173,19 +173,59 @@ directory = {
 	"review_from_all_hidden_random_walks": ExperimentHeader(
 		"""
 			Let's try to do a RNN that operates on pieces of the graph
+			Generate random walks.
 
-			Generate random walks, of this sort of shape:
+			This is a great problem because it requires the network to find a specific
+			shape of subgraph in order to answer the question.
 
-			(PERSON) --> (REVIEW) --> (PRODUCT) <-- (REVIEW) <-- (PERSON) --> (REVIEW) --> (PRODUCT)
+			It needs to find a loop, with 1s on the review scores, like such:
+
+			(REVIEW=1)  --> (PRODUCT) <--  (REVIEW=1) <-- (PERSON_B)
+				↑											  |
+				|											  ↓
+			(PERSON_A) --> (THE_REVIEW) --> (PRODUCT) <-- (REVIEW=1)
+
+
+			# Idea
+
+			What if the parameters define a shape the network wants to look for?
+
+			That's the solution to this problem and could be useful for other problems,
+			particularly since the magic of neural networks lets you define a noise-resiliant
+			function, and an ensemble of shapes.
+
+			Let:
+
+			const string_length = 9
+			pattern:List[part]  = |----|-----|-----|----|  ==>  Convolve 1D with path
+			path:List[part]     = (a)-->(b)-->(c)-->(d)
+			part                = (type, parameter_values, is_target) | Loop | None
+			target_type         = "REVIEW"
+
+			## Algorithm
+
+			1) For each node of type=target_type:
+			1.a) Generate all paths s.t. |path| <= string_length
+			1.b) If a path is cyclic it should have a 'Loop' element after the nodes
+			2) Feed to network ([path, ..., path], target_review_score)
+			3) Network performs 1D convolution of each path with pattern kernel (The overflow of the kernel should wrap around the input path)
+			4) Network performs a 1D convolution on those outputs
+			5) Network sums those values
+			6) Network applies a dense layer, thus outputting y_prediction
+
+
+
+
+		
 
 		""",
 		EXPERIMENT_4_DATASET,
 		"""
 			MATCH p=
 				(otherA) 
-					-[*3]-
+					-[*0..10]-
 				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-					-[*3]-
+					-[*0..10]-
 				(otherB)
 			WHERE review.id={id}
 			WITH
@@ -198,15 +238,15 @@ directory = {
 		float,
 		{
 			"target_dropout": 0.0,
-			"sequence_size": 100,
+			"sequence_size": 600,
 			"memory_size": 1000,
 			"word_size": 4,
 			"patch_width": 1006,
 			"patch_size": 7,
 			"epochs": 20,
 			"repeat_batch": 1,
-			"working_width": 32,
-			"id_limit": 200
+			"working_width": 64,
+			"id_limit": 1000
 		}, 
 		["id_limit"]
 	),

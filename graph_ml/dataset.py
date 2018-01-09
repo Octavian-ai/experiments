@@ -327,7 +327,8 @@ class DatasetHelpers(object):
 
 			review = row["review"]
 			x = np.array([path_to_patch(review, path) for path in row["neighbors"]])
-			x = ensure_length(x, seq_size)
+			x = ensure_length(x, seq_size/3)
+			x = np.repeat(x, 3, axis=0)
 
 			y = row["review"].properties.get("score", -1.0)
 			y = np.repeat([y], seq_size)
@@ -350,15 +351,19 @@ class DatasetHelpers(object):
 		def balance_classes(stream):
 			# ugh arch pain
 			# instead pass in an arg that is a callable stream generator
-			all_pts = list(stream)
 
-			ones  = (i for i in all_pts if i.y[0] == 1.0)
-			zeros = (i for i in all_pts if i.y[0] == 0.0)
+			classes = [0.0, 1.0]
+			last = [None, None]
 
-			for i in zip(ones, zeros):
-				yield i[0]
-				yield i[1]
-
+			# Over-sample
+			# This is imperfectly balanced as it cold-starts without last values
+			for i in stream:
+				for index, c in enumerate(classes):
+					if i.y[0] == c:
+						last[index] = i
+						yield i
+					elif last[index] is not None:
+						yield last[index]
 			
 
 		def transform(stream):
