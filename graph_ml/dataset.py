@@ -1,5 +1,5 @@
 
-from collections import Counter
+from collections import Counter, namedtuple
 import random
 import pickle
 import os.path
@@ -20,6 +20,7 @@ from keras.utils import np_utils
 
 from .path import generate_output_path, generate_data_path
 from graph_io import *
+from .util import *
 
 logger = logging.getLogger(__name__)
 
@@ -267,10 +268,15 @@ class DatasetHelpers(object):
 	def review_from_all_hidden_random_walks(experiment):
 
 		encode_label = {
-			"PERSON":  [0,1,0,0],
-			"REVIEW":  [0,0,1,0],
-			"PRODUCT": [0,0,0,1]
+			"NODE":	   [1,0,0,0,0],
+			"PERSON":  [0,1,0,0,0],
+			"REVIEW":  [0,0,1,0,0],
+			"PRODUCT": [0,0,0,1,0],
+			"LOOP":	   [0,0,0,0,1]
 		}
+
+		FakeNode = namedtuple('FakeNode', ['id', 'properties', 'labels'])
+		loop_node = FakeNode(None, {}, set(['NODE', 'LOOP']))
 
 		def extract_label(l):
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
@@ -287,9 +293,12 @@ class DatasetHelpers(object):
 		def package_node(n, is_target=False):
 			ms = experiment.header.params['memory_size']
 
-			address_trunc = node_id_to_memory_addr(n.id)
-			address_one_hot = np.zeros(ms)
-			address_one_hot[address_trunc] = 1.0
+			if experiment.header.params["generate_address"]:
+				address_trunc = node_id_to_memory_addr(n.id)
+				address_one_hot = np.zeros(ms)
+				address_one_hot[address_trunc] = 1.0
+			else:
+				address_one_hot = np.array([])
 
 			label = extract_label(n.labels)
 			score = n.properties.get("score", -1.0)
@@ -311,11 +320,20 @@ class DatasetHelpers(object):
 			elif delta < 0:
 				arr = arr[:length]
 
+			assert(len(arr) == length, f"ensure_length failed to resize, {len(arr)} != {length}")
+
 			return arr
 
 
 		def path_to_patch(node, path):
 			ps = np.array([package_node(i, i.id == node.id) for i in path.nodes])
+
+			if path.nodes[0].id == path.nodes[-1].id:
+				l = np.array([package_node(loop_node, False)])
+				np.append(ps, l, axis=0)
+
+			ps = np.repeat(ps, 2, axis=0)
+
 			patch_size = experiment.header.params["patch_size"]
 			ps = ensure_length(ps, patch_size)
 			return ps
@@ -325,14 +343,16 @@ class DatasetHelpers(object):
 			patch_size = experiment.header.params["patch_size"]
 			seq_size = experiment.header.params["sequence_size"]
 
+			neighbors = row["neighbors"]
 			review = row["review"]
-			x = np.array([path_to_patch(review, path) for path in row["neighbors"]])
-			x = ensure_length(x, seq_size/3)
-			x = np.repeat(x, 3, axis=0)
+
+			x = np.array([path_to_patch(review, path) for path in neighbors])
+			x = ensure_length(x, seq_size)
+			# x = np.repeat(x, 3, axis=0)
 
 			y = row["review"].properties.get("score", -1.0)
-			y = np.repeat([y], seq_size)
-			y = np.expand_dims(y, axis=-1)
+			# y = np.repeat([y], seq_size)
+			# y = np.expand_dims(y, axis=-1)
 
 			target_shape = (seq_size, patch_size, experiment.header.params["patch_width"])
 			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
@@ -359,7 +379,7 @@ class DatasetHelpers(object):
 			# This is imperfectly balanced as it cold-starts without last values
 			for i in stream:
 				for index, c in enumerate(classes):
-					if i.y[0] == c:
+					if np.array([i.y]).flatten()[0] == c:
 						last[index] = i
 						yield i
 					elif last[index] is not None:

@@ -28,7 +28,7 @@ class NodeClient(object):
         for x in self._session.run(cypher.value, **query_params.cypher_query_parameters):
             yield x
 
-    def execute_cypher_once_per_id(self, cypher: CypherQuery, query_params: QueryParams, dataset_name, batch_size=32, id_limit=None, id_type="Node"):
+    def execute_cypher_once_per_id(self, cypher: CypherQuery, query_params: QueryParams, dataset_name, batch_size=8, id_limit=None, id_type="Node"):
         # TODO: If you use this for writes then bad things can happen
         total = id_limit/batch_size if id_limit is not None else None
         for node_ids in tqdm(chunked(self.get_node_ids(dataset_name, id_limit, id_type), batch_size), total=total):

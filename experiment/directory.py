@@ -214,39 +214,34 @@ directory = {
 			6) Network applies a dense layer, thus outputting y_prediction
 
 
-
-
-		
-
 		""",
 		EXPERIMENT_4_DATASET,
 		"""
 			MATCH p=
-				(otherA) 
-					-[*0..10]-
 				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-					-[*0..10]-
+					-[*0..8]-
 				(otherB)
 			WHERE review.id={id}
 			WITH
 				review,
-				COLLECT(p)[0..200] as neighbors
+				COLLECT(p)[0..600] as neighbors
 			RETURN 
 				review,
 				neighbors
 		""",
 		float,
 		{
+			"generate_address": False,
 			"target_dropout": 0.0,
-			"sequence_size": 600,
 			"memory_size": 1000,
 			"word_size": 4,
-			"patch_width": 1006,
-			"patch_size": 7,
+			"sequence_size": 600,
+			"patch_width": 7,
+			"patch_size": 20,
 			"epochs": 20,
 			"repeat_batch": 1,
 			"working_width": 64,
-			"id_limit": 1000
+			"id_limit": 32
 		}, 
 		["id_limit"]
 	),

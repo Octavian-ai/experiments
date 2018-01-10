@@ -114,9 +114,41 @@ class Model(object):
 			# score = Dense(experiment.header.params["working_width"]*2, activation="tanh")(flat_patch)
 			# score = Dense(experiment.header.params["working_width"],   activation="tanh")(flat_patch)
 
-			rnn = PatchNTM(experiment).build()
-			score = rnn(patch)
-			score = Dense(1, activation="sigmoid", name="score_dense")(score)	
+			# rnn = PatchNTM(experiment).build()
+			# score = rnn(patch)
+
+			# Data format
+			# x      = [x_path, x_path, x_path]
+			# x_path = [x_node, x_node, x_node]
+			# x_node = [label, score, is_head]
+
+			# x = [
+			# 	[
+			# 		[label, score, is_head]:Node, 
+			# 		[label, score, is_head]:Node
+			# 	]:Path, 
+			# 	[
+			# 		[label, score, is_head]:Node, 
+			# 		[label, score, is_head]:Node
+			# 	]:Path 
+			# ]:Sequence
+
+			# Convolve path-pattern
+			channels = 8
+			pattern_length = 8
+
+			m = patch
+
+			# Add channels for convolution
+			m = Lambda(lambda x: K.expand_dims(x, axis=-1))(m)
+
+			# Compute!!
+			m = Conv3D(channels, (1, pattern_length, pw), activation='relu')(m)
+			pattern_conv_out_size = ps - pattern_length + 1
+
+			m = Reshape([ss * channels * pattern_conv_out_size])(m)
+			m = Dense(4, activation="relu", name="score_dense")(m)
+			score = Dense(1, activation="sigmoid", name="score_out")(m)
 			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
