@@ -329,6 +329,7 @@ class DatasetHelpers(object):
 			ps = np.array([package_node(i, i.id == node.id) for i in path.nodes])
 
 			if path.nodes[0].id == path.nodes[-1].id:
+				print("outputting loop_node for ", path.nodes[0].id, [i.id for i in path.nodes])
 				l = np.array([package_node(loop_node, False)])
 				np.append(ps, l, axis=0)
 

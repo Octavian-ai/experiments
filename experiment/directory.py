@@ -219,7 +219,7 @@ directory = {
 		"""
 			MATCH p=
 				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-					-[*0..8]-
+					-[*1..8]-
 				(otherB)
 			WHERE review.id={id}
 			WITH
@@ -241,7 +241,7 @@ directory = {
 			"epochs": 20,
 			"repeat_batch": 1,
 			"working_width": 64,
-			"id_limit": 32
+			"id_limit": 32 * 10
 		}, 
 		["id_limit"]
 	),
