@@ -153,6 +153,25 @@ class Model(object):
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
 
+		elif experiment.name == 'review_from_all_hidden_adj':
+
+			pr_c = experiment.header.params["product_count"]
+			pe_c = experiment.header.params["person_count"]
+
+			adj_con = Input(shape=(pr_c, pe_c), dtype='float32', name="adj_con")
+
+			# People preference vectors
+			people = None
+
+			# Product style vectors
+			product = None
+
+			product_people = dot([product, people], axes=0)
+			scores = multiply([product_people, adj_con])
+
+			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
+
+
 
 		# Compile time!
 		if experiment.header.target == float:

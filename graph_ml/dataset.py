@@ -20,6 +20,7 @@ from keras.utils import np_utils
 
 from .path import generate_output_path, generate_data_path
 from graph_io import *
+# from experiment import Experiment
 from .util import *
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ class Dataset(object):
 	@classmethod
 	def get(cls, experiment):
 		
+		# TODO: delete this
 		recipes = {
 			'review_from_visible_style': Recipe(
 				split=lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
@@ -96,11 +98,17 @@ class Dataset(object):
 			),
 			'review_from_all_hidden_simple_unroll': Recipe(
 				split=DatasetHelpers.review_from_all_hidden(experiment)
-			),
-			'review_from_all_hidden_random_walks': DatasetHelpers.review_from_all_hidden_random_walks(experiment)
+			)
 		}
 
-		return Dataset(experiment, recipes[experiment.name])
+		try:
+			recipe = recipes[experiment.name]
+		except:
+			# TODO: move all to this pattern
+			recipe = getattr(DatasetHelpers, experiment.name)(experiment)
+
+
+		return Dataset(experiment, recipe)
 
 		
 
@@ -194,6 +202,21 @@ class Dataset(object):
 
 
 class DatasetHelpers(object):
+
+	@staticmethod
+	def ensure_length(arr, length):
+		delta = length - arr.shape[0]
+		if delta > 0:
+			pad_shape = ((0,delta),)
+			for i in range(len(arr.shape)-1):
+				pad_shape += ((0, 0),)
+			arr = np.pad(arr, pad_shape, 'constant', constant_values=0.0)
+		elif delta < 0:
+			arr = arr[:length]
+
+		assert(len(arr) == length, f"ensure_length failed to resize, {len(arr)} != {length}")
+
+		return arr
 
 	@staticmethod
 	def path_map_style_preference_score(cls, path):
@@ -310,20 +333,6 @@ class DatasetHelpers(object):
 
 			return x
 
-		def ensure_length(arr, length):
-			delta = length - arr.shape[0]
-			if delta > 0:
-				pad_shape = ((0,delta),)
-				for i in range(len(arr.shape)-1):
-					pad_shape += ((0, 0),)
-				arr = np.pad(arr, pad_shape, 'constant', constant_values=0.0)
-			elif delta < 0:
-				arr = arr[:length]
-
-			assert(len(arr) == length, f"ensure_length failed to resize, {len(arr)} != {length}")
-
-			return arr
-
 
 		def path_to_patch(node, path):
 			ps = np.array([package_node(i, i.id == node.id) for i in path.nodes])
@@ -336,7 +345,7 @@ class DatasetHelpers(object):
 			ps = np.repeat(ps, 2, axis=0)
 
 			patch_size = experiment.header.params["patch_size"]
-			ps = ensure_length(ps, patch_size)
+			ps = DatasetHelpers.ensure_length(ps, patch_size)
 			return ps
 
 
@@ -348,7 +357,7 @@ class DatasetHelpers(object):
 			review = row["review"]
 
 			x = np.array([path_to_patch(review, path) for path in neighbors])
-			x = ensure_length(x, seq_size)
+			x = DatasetHelpers.ensure_length(x, seq_size)
 			# x = np.repeat(x, 3, axis=0)
 
 			y = row["review"].properties.get("score", -1.0)
@@ -396,6 +405,56 @@ class DatasetHelpers(object):
 			return stream
 
 		return Recipe(transform=transform,query=query)
+
+	@staticmethod
+	def review_from_all_hidden_adj(experiment) -> Recipe:
+
+		def transform(stream):
+			data = list(stream)
+
+			person_product = {}
+
+			products = set()
+			people = set()
+
+			# Construct adjacency dict
+			for i in data:
+				if i["person_id"] not in person_product:
+					person_product[i["person_id"]] = {}
+
+				person_product[i["person_id"]][i["product_id"]] = i["score"]
+
+				products.add(i["product_id"])
+				people.add(i["person_id"])
+
+			def exists(person, product):
+				return 1.0 if person in person_product and product in person_product[person] else 0.0
+
+			def score(person, product):
+				return person_product.get(person, -1).get(product, -1) 
+
+			pr_c = experiment.header.params["product_count"]
+			pe_c = experiment.header.params["person_count"]
+
+			def build(fn):
+				return DatasetHelpers.ensure_length(np.array([
+					DatasetHelpers.ensure_length(
+						np.array([score(i, j) for j in products])
+					, pr_c) for i in people
+				]), pe_c)
+
+			adj_score = build(score)
+			adj_con = build(exists)
+
+			assert_mtx_shape(adj_score, (pe_c, pr_c), "adj_score")
+			assert_mtx_shape(adj_con, (pe_c, pr_c))
+
+			print(adj_score)
+
+			yield Point(adj_con, adj_score)
+
+
+		return Recipe(transform=transform)
 
 
 

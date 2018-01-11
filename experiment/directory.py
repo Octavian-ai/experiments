@@ -219,7 +219,7 @@ directory = {
 		"""
 			MATCH p=
 				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-					-[*1..8]-
+					-[*8]-
 				(otherB)
 			WHERE review.id={id}
 			WITH
@@ -246,6 +246,33 @@ directory = {
 		["id_limit"]
 	),
 
+	"review_from_all_hidden_adj": ExperimentHeader(
+		"""
+			Try the following:
+				- variable pr represents PRODUCT style vectors
+				- variable pe represents PERSON preference vectors
+				- x = adj matrix of PRODUCT-REVIEW-PERSON
+				- y = adj matrix of same with REVIEW.score as the weights
+				- Use optimizer to optimize the style/pref vectors such that: Dot(MatMul(pr, T(pe)), x) = y
+
+
+		""",
+		EXPERIMENT_4_DATASET,
+		"""
+			MATCH p=
+				(person:PERSON) -->
+				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) -->
+				(product:PRODUCT)
+			RETURN 
+				person.id as person_id, review.score as score, product.id as product_id
+		""",
+		float,
+		{
+			"product_count": 400,
+			"person_count": 400
+		}
+	),
+
 	"style_from_neighbor_conv": ExperimentHeader(
 		""" 
 		A precursor to review_from_hidden_style_neighbor_conv
@@ -270,6 +297,6 @@ directory = {
 
 }
 
-default_experiment = "review_from_all_hidden_random_walks"
+default_experiment = "review_from_all_hidden_adj"
 
 
