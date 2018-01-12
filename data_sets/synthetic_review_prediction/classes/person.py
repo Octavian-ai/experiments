@@ -2,7 +2,7 @@ from uuid import UUID, uuid4
 from .graph_node import GraphNodeIdentifier, GraphNode, NodeLabel, IsGoldenFlag
 from basic_types import NanoID, NanoType
 from .style import Style
-from .dynamic_enum import DynamicEnum
+from .dynamic_enum import DynamicEnum, DynamicEnumVector
 
 class PersonID(GraphNodeIdentifier):
     LABEL = NodeLabel('PERSON')
@@ -12,13 +12,16 @@ class PersonID(GraphNodeIdentifier):
 
 
 class PersonStylePreferenceEnum(DynamicEnum[Style]):
-
     @property
     def style(self):
         return self.defn
 
 
-class PersonStylePreference(NanoType[PersonStylePreferenceEnum]):
+class PersonStylePreferenceVector(DynamicEnumVector[PersonStylePreferenceEnum]):
+    pass
+
+
+class PersonStylePreference(NanoType[PersonStylePreferenceVector]):
     pass
 
 

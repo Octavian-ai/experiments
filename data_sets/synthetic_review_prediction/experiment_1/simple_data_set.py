@@ -6,9 +6,13 @@ import random
 
 
 class SimpleDataSet(object):
-    def __init__(self, properties: DataSetProperties, opinion_function: Callable[[Person, Product], ReviewScore]):
-        self.opinion_function = opinion_function
-        self.properties = properties
+    def __init__(self,
+                 properties: DataSetProperties
+                 ):
+        self.product_style_function = properties.product_style_function
+        self.person_style_function = properties.person_style_function
+        self.opinion_function = properties.opinion_function
+        self.properties: DataSetProperties = properties
 
         self._public_products: List[Product] = list()
         self._public_people_ids: Set[PersonID] = set()
@@ -23,18 +27,18 @@ class SimpleDataSet(object):
 
     def generate_public_products(self):
         for i in range(self.properties.n_products):
-            style = choose_weighted_option(self.properties.product_styles_distribution)
-            product_style = ProductStyle(style)
+            product_style = ProductStyle(self.product_style_function(self.properties.product_styles_distribution))
             product = Product(ProductID.new_random(), IsGoldenFlag(False), product_style)
             self._public_products.append(product)
             yield product
 
     def generate_public_people(self):
+        properties: DataSetProperties = self.properties
         for i in range(self.properties.n_people):
             number_of_reviews = choose_weighted_option(self.properties.reviews_per_person_distribution)
             number_of_company_opinions = choose_weighted_option(self.properties.person_company_number_of_relationships_distribution)
             meta = PersonMetaProperties(number_of_reviews=number_of_reviews, number_of_company_opinions=number_of_company_opinions)
-            style_preference = PersonStylePreference(choose_weighted_option(self.properties.person_styles_distribution))
+            style_preference = PersonStylePreference(self.person_style_function(properties.person_styles_distribution))
             person = Person(PersonID.new_random(), IsGoldenFlag(False), style_preference, meta_properties=meta)
             self._public_people_ids.add(person.id)
             yield person

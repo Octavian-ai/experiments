@@ -3,6 +3,8 @@ from ..meta_classes.data_set_properties import PersonStyleWeightDistribution, Pe
 from ..utils import WeightedOption, Distribution
 from ..classes import PersonStylePreferenceEnum, ProductStyleEnum, Style
 from graph_io.classes.dataset_name import DatasetName
+from ..experiment_1.opinion_function import opinion_function
+from ..experiment_1.style_functions import product_style_function, person_style_function
 
 DATASET_NAME = DatasetName('synthetic_review_prediction experiment_4')
 
@@ -29,7 +31,10 @@ def create_data_set_properties() -> DataSetProperties:
         product_styles_distribution=Distribution[ProductStyleWeight, ProductStyleEnum]([
             ProductStyleWeight(x, 1) for x in ProductStyleEnum.iterate()
         ]),
-        person_company_number_of_relationships_distribution=[]
+        person_company_number_of_relationships_distribution=[],
+        opinion_function=opinion_function,
+        person_style_function=person_style_function,
+        product_style_function=product_style_function
     )
 
     return data_set_properties
