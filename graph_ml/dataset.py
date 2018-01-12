@@ -121,14 +121,22 @@ class Dataset(object):
 		if experiment.params.random_seed is not None:
 			random.seed(experiment.params.random_seed)
 
+		if experiment.params.dataset_name is not None:
+			dataset_name = experiment.params.dataset_name
+		else:
+			dataset_name = experiment.header.dataset_name
+
 		query_params = QueryParams(
 			golden=experiment.params.golden, 
-			dataset_name=experiment.header.dataset_name, 
+			dataset_name=dataset_name, 
 			experiment=experiment.name)
 
 		query_params.update(QueryParams(**experiment.header.params))
 
+		# Calculate params for lazy data loading
 		data_path_params = {i:query_params[i] for i in experiment.header.lazy_params}
+		data_path_params["dataset_name"] = experiment.params.dataset_name
+
 		dataset_file = generate_data_path(experiment, '.pkl', data_path_params)
 		logger.info(f"Dataset file {dataset_file}")
 
