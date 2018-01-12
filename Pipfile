@@ -20,6 +20,7 @@ recurrentshop = {git = "https://github.com/datalogai/recurrentshop.git"}
 colored-traceback = "*"
 sklearn = "*"
 tqdm = "*"
+floyd-cli = "*"
 
 
 [dev-packages]

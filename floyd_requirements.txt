@@ -1,3 +1,10 @@
 neo4j-driver
 lazy
 h5py
+colorama
+coloredlogs
+more-itertools
+git+git://github.com/datalogai/recurrentshop.git#egg=recurrentshop
+colored-traceback
+sklearn
+tqdm

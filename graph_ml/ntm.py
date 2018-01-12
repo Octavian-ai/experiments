@@ -17,18 +17,16 @@ class NTMBase(object):
 
 		self.patch_size  = experiment.header.params["patch_size"]
 		self.patch_width = experiment.header.params["patch_width"]
-
+		self.working_width = experiment.header.params["working_width"]
 		self.word_size = self.experiment.header.params["word_size"]
 		self.batch_size = self.experiment.params.batch_size
 		self.memory_size = self.experiment.header.params["memory_size"]
+		self.patch_data_width = self.patch_width - self.memory_size
 
 		self.word_shape = [self.word_size]
 		self.word_shape_batch = [self.batch_size, self.word_size]
 		self.memory_shape = [self.memory_size, self.word_size]
 		self.memory_shape_batch = [self.batch_size] + self.memory_shape
-
-		self.patch_data_width = self.patch_width - self.memory_size
-		self.working_width = experiment.header.params["working_width"]
 
 
 	def combine_nodes(self, patch, width):
@@ -136,40 +134,50 @@ class PatchNTM(NTMBase):
 		# first_node = Lambda(lambda x: x[:,:self.patch_data_width])(flat_patch)
 		patch_without_memory_addr = Lambda(lambda x: x[:,:,:self.patch_data_width:])(patch)
 		flat_patch = Reshape([self.patch_size*self.patch_data_width])(patch_without_memory_addr)
-		# working_memory = concatenate([first_node, conv])
-		working_memory = Dense(self.working_width, activation='tanh')(flat_patch)
+		
+		working_memory = Dense(self.working_width, activation='relu')(flat_patch)
+		# conv = self.combine_nodes(patch, self.working_width)
+		# working_memory = concatenate([working_memory, conv])
+		# working_memory = Dense(self.working_width, activation='relu')(working_memory)
 
+		pre_memory = working_memory
 
-		if self.experiment.header.params["use_memory"]:
+		use_memory = False
+
+		if use_memory:
 			# ------- Memory operations --------- #
-			address = self.generate_address(working_memory, patch, name="address_read1")
+
+			primary_address = Lambda(lambda x: x[:,3,self.patch_data_width:])(patch)
+			print(primary_address)
+
+			address = self.generate_address(primary_address, patch, name="address_read1")
 			read1 = self.read(memory_t, address)
 
 			# Turn batch dimension from None to batch_size
-			working_memory = Lambda(lambda x: K.reshape(x, [self.batch_size, self.working_width]))(working_memory)
-			working_memory = concatenate([working_memory, read1], batch_size=self.batch_size)
+			batched_working_memory = Lambda(lambda x: K.reshape(x, [self.batch_size, self.working_width]))(working_memory)
+			batched_working_memory = concatenate([batched_working_memory, read1], batch_size=self.batch_size)
 			
-			working_memory = Dense(self.working_width, activation='tanh')(working_memory)
+			batched_working_memory = Dense(self.working_width, activation='relu')(batched_working_memory)
 
-			erase_word = Dense(self.word_size, name="DenseEraseWord", activation='tanh')(working_memory)
-			address = self.generate_address(working_memory, patch, name="address_erase")
-			memory_t = self.erase(memory_t, address, erase_word)
+			erase_word = Dense(self.word_size, name="DenseEraseWord", activation='relu')(batched_working_memory)
+			# address = self.generate_address(batched_working_memory, patch, name="address_erase")
+			erase_word = Lambda(lambda x: K.ones_like(x))(erase_word)
+			memory_t = self.erase(memory_t, primary_address, erase_word)
 		
-			write_word = Dense(self.word_size, name="DenseWriteWord", activation='tanh')(working_memory)
-			address = self.generate_address(working_memory, patch, name="address_write")
-			memory_t = self.write(memory_t, address, write_word)
+			write_word = Dense(self.word_size, name="DenseWriteWord", activation='relu')(batched_working_memory)
+			# address = self.generate_address(batched_working_memory, patch, name="address_write")
+			memory_t = self.write(memory_t, primary_address, write_word)
 
-			address = self.generate_address(working_memory, patch, name="address_read2")
-			read2 = self.read(memory_t, address)
+			# address = self.generate_address(batched_working_memory, patch, name="address_read2")
+			# read2 = self.read(memory_t, address)
 
-			working_memory = concatenate([working_memory, read2])
+			# working_memory = concatenate([batched_working_memory, read1])
+			working_memory = Dense(self.working_width, activation="relu")(batched_working_memory)
 
-
-		out = Dense(1)(working_memory)
 
 		return RecurrentModel(
 			input=patch,
-			output=out,
+			output=working_memory,
 			return_sequences=True,
 			stateful=True,
 

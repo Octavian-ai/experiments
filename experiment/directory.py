@@ -170,38 +170,108 @@ directory = {
 		}
 	),
 
-	"review_from_all_hidden_ntm": ExperimentHeader(
+	"review_from_all_hidden_random_walks": ExperimentHeader(
 		"""
 			Let's try to do a RNN that operates on pieces of the graph
+			Generate random walks.
+
+			This is a great problem because it requires the network to find a specific
+			shape of subgraph in order to answer the question.
+
+			It needs to find a loop, with 1s on the review scores, like such:
+
+			(REVIEW=1)  --> (PRODUCT) <--  (REVIEW=1) <-- (PERSON_B)
+				↑											  |
+				|											  ↓
+			(PERSON_A) --> (THE_REVIEW) --> (PRODUCT) <-- (REVIEW=1)
+
+
+			# Idea
+
+			What if the parameters define a shape the network wants to look for?
+
+			That's the solution to this problem and could be useful for other problems,
+			particularly since the magic of neural networks lets you define a noise-resiliant
+			function, and an ensemble of shapes.
+
+			Let:
+
+			const string_length = 9
+			pattern:List[part]  = |----|-----|-----|----|  ==>  Convolve 1D with path
+			path:List[part]     = (a)-->(b)-->(c)-->(d)
+			part                = (type, parameter_values, is_target) | Loop | None
+			target_type         = "REVIEW"
+
+			## Algorithm
+
+			1) For each node of type=target_type:
+			1.a) Generate all paths s.t. |path| <= string_length
+			1.b) If a path is cyclic it should have a 'Loop' element after the nodes
+			2) Feed to network ([path, ..., path], target_review_score)
+			3) Network performs 1D convolution of each path with pattern kernel (The overflow of the kernel should wrap around the input path)
+			4) Network performs a 1D convolution on those outputs
+			5) Network sums those values
+			6) Network applies a dense layer, thus outputting y_prediction
+
 
 		""",
 		EXPERIMENT_4_DATASET,
 		"""
 			MATCH p=
 				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) 
-					-[*5]-
-				(other)
+					-[*8]-
+				(otherB)
 			WHERE review.id={id}
 			WITH
 				review,
-				COLLECT(p)[0..15] as neighbors
+				COLLECT(p)[0..600] as neighbors
 			RETURN 
 				review,
 				neighbors
 		""",
-		"Special",
+		float,
 		{
+			"generate_address": False,
 			"target_dropout": 0.0,
-			"sequence_size": 16,
 			"memory_size": 1000,
 			"word_size": 4,
-			"patch_width": 1006,
-			"patch_size": 7,
+			"sequence_size": 600,
+			"patch_width": 7,
+			"patch_size": 20,
 			"epochs": 20,
 			"repeat_batch": 1,
-			"use_memory": True,
-			"working_width": 32,
-			"id_limit": 20000
+			"working_width": 64,
+			"id_limit": 32 * 10
+		}, 
+		["id_limit"]
+	),
+
+	"review_from_all_hidden_adj": ExperimentHeader(
+		"""
+			Try the following:
+				- variable pr represents PRODUCT style vectors
+				- variable pe represents PERSON preference vectors
+				- x = adj matrix of PRODUCT-REVIEW-PERSON
+				- y = adj matrix of same with REVIEW.score as the weights
+				- Use optimizer to optimize the style/pref vectors such that: Dot(MatMul(pr, T(pe)), x) = y
+
+
+		""",
+		EXPERIMENT_4_DATASET,
+		"""
+			MATCH p=
+				(person:PERSON) -->
+				(review:REVIEW {is_golden:{golden}, dataset_name:{dataset_name}}) -->
+				(product:PRODUCT)
+			RETURN 
+				person.id as person_id, review.score as score, product.id as product_id
+		""",
+		float,
+		{
+			"product_count": 160,
+			"person_count": 1600,
+			"style_width": 1,
+			"epochs": 5
 		}
 	),
 
@@ -229,6 +299,6 @@ directory = {
 
 }
 
-default_experiment = "review_from_all_hidden_ntm"
+default_experiment = "review_from_all_hidden_adj"
 
 

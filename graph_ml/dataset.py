@@ -1,5 +1,5 @@
 
-from collections import Counter
+from collections import Counter, namedtuple
 import random
 import pickle
 import os.path
@@ -20,6 +20,8 @@ from keras.utils import np_utils
 
 from .path import generate_output_path, generate_data_path
 from graph_io import *
+# from experiment import Experiment
+from .util import *
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,7 @@ class Dataset(object):
 	@classmethod
 	def get(cls, experiment):
 		
+		# TODO: delete this
 		recipes = {
 			'review_from_visible_style': Recipe(
 				split=lambda row: Point(np.concatenate((row['style_preference'], row['style'])), row['score'])
@@ -95,11 +98,17 @@ class Dataset(object):
 			),
 			'review_from_all_hidden_simple_unroll': Recipe(
 				split=DatasetHelpers.review_from_all_hidden(experiment)
-			),
-			'review_from_all_hidden_ntm': DatasetHelpers.review_from_all_hidden_ntm(experiment)
+			)
 		}
 
-		return Dataset(experiment, recipes[experiment.name])
+		try:
+			recipe = recipes[experiment.name]
+		except:
+			# TODO: move all to this pattern
+			recipe = getattr(DatasetHelpers, experiment.name)(experiment)
+
+
+		return Dataset(experiment, recipe)
 
 		
 
@@ -112,14 +121,23 @@ class Dataset(object):
 		if experiment.params.random_seed is not None:
 			random.seed(experiment.params.random_seed)
 
+		if experiment.params.dataset_name is not None:
+			dataset_name = experiment.params.dataset_name
+		else:
+			dataset_name = experiment.header.dataset_name
+
 		query_params = QueryParams(
 			golden=experiment.params.golden, 
-			dataset_name=experiment.header.dataset_name, 
+			dataset_name=dataset_name, 
 			experiment=experiment.name)
 
 		query_params.update(QueryParams(**experiment.header.params))
 
-		dataset_file = generate_data_path(experiment, '.pkl', query_params)
+		# Calculate params for lazy data loading
+		data_path_params = {i:query_params[i] for i in experiment.header.lazy_params}
+		data_path_params["dataset_name"] = experiment.params.dataset_name
+
+		dataset_file = generate_data_path(experiment, '.pkl', data_path_params)
 		logger.info(f"Dataset file {dataset_file}")
 
 		if os.path.isfile(dataset_file) and experiment.params.lazy:
@@ -177,12 +195,12 @@ class Dataset(object):
 		
 		bs = experiment.params.batch_size
 
-
 		self.train_generator 		= peekable(chunk(just("train"), bs))
 		self.validation_generator 	= peekable(chunk(just("validate"), bs))
 		self.test_generator 		= chunk(just("test"), bs)
 
-		# logger.info(f"First training item: {self.train_generator.peek()}")
+		f = self.train_generator.peek()
+		logger.info(f"First training item: x:{f[0].shape}, y:{f[1].shape}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
@@ -193,6 +211,21 @@ class Dataset(object):
 
 
 class DatasetHelpers(object):
+
+	@staticmethod
+	def ensure_length(arr, length):
+		delta = length - arr.shape[0]
+		if delta > 0:
+			pad_shape = ((0,delta),)
+			for i in range(len(arr.shape)-1):
+				pad_shape += ((0, 0),)
+			arr = np.pad(arr, pad_shape, 'constant', constant_values=0.0)
+		elif delta < 0:
+			arr = arr[:length]
+
+		assert(len(arr) == length, f"ensure_length failed to resize, {len(arr)} != {length}")
+
+		return arr
 
 	@staticmethod
 	def path_map_style_preference_score(cls, path):
@@ -264,13 +297,18 @@ class DatasetHelpers(object):
 		return t
 
 	@staticmethod
-	def review_from_all_hidden_ntm(experiment):
+	def review_from_all_hidden_random_walks(experiment):
 
 		encode_label = {
-			"PERSON":  [0,1,0,0],
-			"REVIEW":  [0,0,1,0],
-			"PRODUCT": [0,0,0,1]
+			"NODE":	   [1,0,0,0,0],
+			"PERSON":  [0,1,0,0,0],
+			"REVIEW":  [0,0,1,0,0],
+			"PRODUCT": [0,0,0,1,0],
+			"LOOP":	   [0,0,0,0,1]
 		}
+
+		FakeNode = namedtuple('FakeNode', ['id', 'properties', 'labels'])
+		loop_node = FakeNode(None, {}, set(['NODE', 'LOOP']))
 
 		def extract_label(l):
 			return encode_label.get(list(set(l) - set('NODE'))[0], [1,0,0,0])
@@ -284,53 +322,56 @@ class DatasetHelpers(object):
 
 			return node_id_dict[nid]
 
-		def package_node(n, is_head=0.0, hide_score=False):
+		def package_node(n, is_target=False):
 			ms = experiment.header.params['memory_size']
 
-			address_trunc = node_id_to_memory_addr(n.id)
-			address_one_hot = np.zeros(ms)
-			address_one_hot[address_trunc] = 1.0
+			if experiment.header.params["generate_address"]:
+				address_trunc = node_id_to_memory_addr(n.id)
+				address_one_hot = np.zeros(ms)
+				address_one_hot[address_trunc] = 1.0
+			else:
+				address_one_hot = np.array([])
 
 			label = extract_label(n.labels)
 			score = n.properties.get("score", -1.0)
 
-			if random.random() < experiment.header.params["target_dropout"] or hide_score:
+			if random.random() < experiment.header.params["target_dropout"] or is_target:
 				score = -1.0
 
-			x = np.concatenate(([is_head, score], label, address_one_hot))
+			x = np.concatenate(([score, float(is_target)], label, address_one_hot))
 
 			return x
 
-		def ensure_length(arr, length):
-			delta = length - arr.shape[0]
-			if delta > 0:
-				pad_shape = ((0,delta),)
-				for i in range(len(arr.shape)-1):
-					pad_shape += ((0, 0),)
-				arr = np.pad(arr, pad_shape, 'constant', constant_values=0.0)
-
-			return arr
-
 
 		def path_to_patch(node, path):
-			n = package_node(node, is_head=1.0, hide_score=True)
-			ps = np.array([package_node(i) for i in path.nodes])
+			ps = np.array([package_node(i, i.id == node.id) for i in path.nodes])
+
+			if path.nodes[0].id == path.nodes[-1].id:
+				print("outputting loop_node for ", path.nodes[0].id, [i.id for i in path.nodes])
+				l = np.array([package_node(loop_node, False)])
+				np.append(ps, l, axis=0)
+
+			ps = np.repeat(ps, 2, axis=0)
 
 			patch_size = experiment.header.params["patch_size"]
-			ps = ensure_length(ps, patch_size - 1)
+			ps = DatasetHelpers.ensure_length(ps, patch_size)
+			return ps
 
-			return np.concatenate([[n], ps])
 
 		def row_to_point(row):
 			patch_size = experiment.header.params["patch_size"]
 			seq_size = experiment.header.params["sequence_size"]
 
+			neighbors = row["neighbors"]
 			review = row["review"]
-			x = np.array([path_to_patch(review, path) for path in row["neighbors"]])
-			x = ensure_length(x, seq_size)
+
+			x = np.array([path_to_patch(review, path) for path in neighbors])
+			x = DatasetHelpers.ensure_length(x, seq_size)
+			# x = np.repeat(x, 3, axis=0)
 
 			y = row["review"].properties.get("score", -1.0)
-			y = np.expand_dims(np.repeat([y], seq_size), axis=-1)
+			# y = np.repeat([y], seq_size)
+			# y = np.expand_dims(y, axis=-1)
 
 			target_shape = (seq_size, patch_size, experiment.header.params["patch_width"])
 			assert x.shape == target_shape, f"{x.shape} != {target_shape}"
@@ -346,25 +387,90 @@ class DatasetHelpers(object):
 				id_type="REVIEW"
 			)
 
-
-		def transform(stream):
-			y_count = Counter()
-
+		def balance_classes(stream):
 			# ugh arch pain
 			# instead pass in an arg that is a callable stream generator
-			all_pts = list((row_to_point(row) for row in stream))
 
-			ones  = (i for i in all_pts if i.y[0] == 1.0)
-			zeros = (i for i in all_pts if i.y[0] == 0.0)
+			classes = [0.0, 1.0]
+			last = [None, None]
 
-			for i in zip(ones, zeros):
-				yield i[0]
-				yield i[1]
+			# Over-sample
+			# This is imperfectly balanced as it cold-starts without last values
+			for i in stream:
+				for index, c in enumerate(classes):
+					if np.array([i.y]).flatten()[0] == c:
+						last[index] = i
+						yield i
+					elif last[index] is not None:
+						yield last[index]
+			
 
+		def transform(stream):
+			# y_count = Counter()
 			# y_count[str(y)] += 1
 			# print(f"Counter of y values: {[(i, y_count[i] / len(list(y_count.elements())) * 100.0) for i in y_count]}")
+			stream = (row_to_point(row) for row in stream)
+			stream = balance_classes(stream)
+			return stream
 
 		return Recipe(transform=transform,query=query)
+
+	@staticmethod
+	def review_from_all_hidden_adj(experiment) -> Recipe:
+
+		def transform(stream):
+			data = list(stream)
+
+			person_product = {}
+
+			products = set()
+			people = set()
+
+			# Construct adjacency dict
+			for i in data:
+				if i["person_id"] not in person_product:
+					person_product[i["person_id"]] = {}
+
+				person_product[i["person_id"]][i["product_id"]] = i["score"]
+
+				products.add(i["product_id"])
+				people.add(i["person_id"])
+
+			def exists(person, product):
+				return 1.0 if person in person_product and product in person_product[person] else 0.0
+
+			def score(person, product):
+				return person_product.get(person, -1).get(product, -1) 
+
+			pr_c = experiment.header.params["product_count"]
+			pe_c = experiment.header.params["person_count"]
+			bs = experiment.params.batch_size
+			shape = (pr_c, pe_c)
+
+			logger.info(f"People returned {len(people)} of capacity {pe_c}")
+			logger.info(f"Products returned {len(products)} of capacity {pr_c}")
+
+			def build(fn):
+				return DatasetHelpers.ensure_length(np.array([
+					DatasetHelpers.ensure_length(
+						np.array([fn(person, product) for person in people])
+					, pe_c) for product in products
+				]), pr_c)
+
+			adj_score = build(score)
+			adj_con = build(exists)
+
+			# print(adj_score)
+			# print(adj_con)
+
+			assert_mtx_shape(adj_score, shape, "adj_score")
+			assert_mtx_shape(adj_con,   shape)
+
+			for i in range(bs):
+				yield Point(adj_con, adj_score)
+
+
+		return Recipe(transform=transform)
 
 
 

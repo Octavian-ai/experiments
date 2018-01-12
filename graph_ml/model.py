@@ -7,6 +7,7 @@ import keras.backend as K
 import tensorflow as tf
 
 from .ntm import *
+from .adjacency_layer import Adjacency
 
 
 # Rainbow sprinkles for your activation function
@@ -50,6 +51,8 @@ class Model(object):
 		# TODO: Move this into Experiment header
 		n_styles = 6
 		n_sequence = 100
+
+		bs = experiment.params.batch_size
 
 		if experiment.name == "review_from_visible_style":
 			model = Sequential([
@@ -102,35 +105,65 @@ class Model(object):
 			model = keras.models.Model(inputs=[neighbors], outputs=[m])
 
 
-		elif experiment.name == 'review_from_all_hidden_ntm':
+		elif experiment.name == 'review_from_all_hidden_random_walks':
 
 			ss = experiment.header.params["sequence_size"]
 			ps = experiment.header.params["patch_size"]
 			pw = experiment.header.params["patch_width"]
-			bs = experiment.params.batch_size
 
-			# https://stackoverflow.com/questions/42969779/keras-error-you-must-feed-a-value-for-placeholder-tensor-bidirectional-1-keras
-			# K.set_learning_phase(1) #set learning phase
-
-
-			# node = Input(batch_shape=(bs,ss,width), dtype='float32', name="node")
-			# neighbors = Input(batch_shape=(bs,ss,nc,width), dtype='float32', name="neighbors")
 			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
-			flat_patch = Reshape([ss, ps*pw])(patch)
+			# flat_patch = Reshape([ss*ps*pw])(patch)
+			# score = Dense(experiment.header.params["working_width"]*2, activation="tanh")(flat_patch)
+			# score = Dense(experiment.header.params["working_width"],   activation="tanh")(flat_patch)
 
-			rnn = PatchNTM(experiment).build()
-			rnn_out = rnn(patch)
+			# rnn = PatchNTM(experiment).build()
+			# score = rnn(patch)
 
-			score = Dense(1, activation="tanh", name="score_dense")(rnn_out)
-			# score = Lambda(lambda x: K.expand_dims(x, axis=-1), name="score_reshape")(score)
+			# Data format
+			# x      = [x_path, x_path, x_path]
+			# x_path = [x_node, x_node, x_node]
+			# x_node = [label, score, is_head]
 
-			# assert score.shape == [bs, ss, 1], f"Score wrong shape, {score.shape}"
+			# x = [
+			# 	[
+			# 		[label, score, is_head]:Node, 
+			# 		[label, score, is_head]:Node
+			# 	]:Path, 
+			# 	[
+			# 		[label, score, is_head]:Node, 
+			# 		[label, score, is_head]:Node
+			# 	]:Path 
+			# ]:Sequence
+
+			# Convolve path-pattern
+			channels = 8
+			pattern_length = 8
+
+			m = patch
+
+			# Add channels for convolution
+			m = Lambda(lambda x: K.expand_dims(x, axis=-1))(m)
+
+			# Compute!!
+			m = Conv3D(channels, (1, pattern_length, pw), activation='relu')(m)
+			pattern_conv_out_size = ps - pattern_length + 1
+
+			m = Reshape([ss * channels * pattern_conv_out_size])(m)
+			m = Dense(4, activation="relu", name="score_dense")(m)
+			score = Dense(1, activation="sigmoid", name="score_out")(m)
 			
 			model = keras.models.Model(inputs=[patch], outputs=[score])
 
-			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.SGD(lr=0.3),
-				metrics=['accuracy'])
+
+		elif experiment.name == 'review_from_all_hidden_adj':
+
+			pr_c = experiment.header.params["product_count"]
+			pe_c = experiment.header.params["person_count"]
+			style_width = experiment.header.params["style_width"]
+
+			adj_con = Input(batch_shape=(bs, pr_c, pe_c), dtype='float32', name="adj_con")
+			scores = Adjacency(pe_c, pr_c, style_width, name="hidden_to_adj")(adj_con)
+			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
 
 
 
