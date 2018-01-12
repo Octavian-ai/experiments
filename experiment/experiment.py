@@ -45,11 +45,15 @@ class Experiment(object):
 
 		print(Fore.YELLOW)
 		print("#######################################################################")
-		print("Experiment results\a")
+		print("Experiment results")
 		print(f"{experiment.name} test loss {score[0]}")
 		print(f"{experiment.name} test accuracy {score[1]}")
 		print("#######################################################################")
 		print(Style.RESET_ALL)
 
+		# t = '-title {!r}'.format(title)
+		# s = '-subtitle {!r}'.format(subtitle)
+		# m = '-message {!r}'.format(message)
+		os.system(f"terminal-notifier -message 'test accuracy {round(score[1]*100)}%' -title Octavian")
 		os.system(f"say test accuracy {round(score[1]*100)} percent")
 		

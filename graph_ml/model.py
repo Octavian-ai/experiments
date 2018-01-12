@@ -7,6 +7,7 @@ import keras.backend as K
 import tensorflow as tf
 
 from .ntm import *
+from .adjacency_layer import Adjacency
 
 
 # Rainbow sprinkles for your activation function
@@ -50,6 +51,8 @@ class Model(object):
 		# TODO: Move this into Experiment header
 		n_styles = 6
 		n_sequence = 100
+
+		bs = experiment.params.batch_size
 
 		if experiment.name == "review_from_visible_style":
 			model = Sequential([
@@ -107,7 +110,6 @@ class Model(object):
 			ss = experiment.header.params["sequence_size"]
 			ps = experiment.header.params["patch_size"]
 			pw = experiment.header.params["patch_width"]
-			bs = experiment.params.batch_size
 
 			patch = Input(batch_shape=(bs,ss,ps,pw), dtype='float32', name="patch")
 			# flat_patch = Reshape([ss*ps*pw])(patch)
@@ -157,18 +159,10 @@ class Model(object):
 
 			pr_c = experiment.header.params["product_count"]
 			pe_c = experiment.header.params["person_count"]
+			style_width = experiment.header.params["style_width"]
 
-			adj_con = Input(shape=(pr_c, pe_c), dtype='float32', name="adj_con")
-
-			# People preference vectors
-			people = None
-
-			# Product style vectors
-			product = None
-
-			product_people = dot([product, people], axes=0)
-			scores = multiply([product_people, adj_con])
-
+			adj_con = Input(batch_shape=(bs, pr_c, pe_c), dtype='float32', name="adj_con")
+			scores = Adjacency(pe_c, pr_c, style_width, name="hidden_to_adj")(adj_con)
 			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
 
 

@@ -268,8 +268,10 @@ directory = {
 		""",
 		float,
 		{
-			"product_count": 400,
-			"person_count": 400
+			"product_count": 160,
+			"person_count": 1600,
+			"style_width": 1,
+			"epochs": 5
 		}
 	),
 

@@ -191,7 +191,8 @@ class Dataset(object):
 		self.validation_generator 	= peekable(chunk(just("validate"), bs))
 		self.test_generator 		= chunk(just("test"), bs)
 
-		# logger.info(f"First training item: {self.train_generator.peek()}")
+		f = self.train_generator.peek()
+		logger.info(f"First training item: x:{f[0].shape}, y:{f[1].shape}")
 
 		# These are not exact counts since the data is randomly split at generation time
 		self.validation_steps 	= math.ceil(total_data * 0.1 / experiment.params.batch_size)
@@ -435,23 +436,30 @@ class DatasetHelpers(object):
 
 			pr_c = experiment.header.params["product_count"]
 			pe_c = experiment.header.params["person_count"]
+			bs = experiment.params.batch_size
+			shape = (pr_c, pe_c)
+
+			logger.info(f"People returned {len(people)} of capacity {pe_c}")
+			logger.info(f"Products returned {len(products)} of capacity {pr_c}")
 
 			def build(fn):
 				return DatasetHelpers.ensure_length(np.array([
 					DatasetHelpers.ensure_length(
-						np.array([score(i, j) for j in products])
-					, pr_c) for i in people
-				]), pe_c)
+						np.array([fn(person, product) for person in people])
+					, pe_c) for product in products
+				]), pr_c)
 
 			adj_score = build(score)
 			adj_con = build(exists)
 
-			assert_mtx_shape(adj_score, (pe_c, pr_c), "adj_score")
-			assert_mtx_shape(adj_con, (pe_c, pr_c))
+			# print(adj_score)
+			# print(adj_con)
 
-			print(adj_score)
+			assert_mtx_shape(adj_score, shape, "adj_score")
+			assert_mtx_shape(adj_con,   shape)
 
-			yield Point(adj_con, adj_score)
+			for i in range(bs):
+				yield Point(adj_con, adj_score)
 
 
 		return Recipe(transform=transform)

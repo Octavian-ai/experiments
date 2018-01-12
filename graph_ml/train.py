@@ -95,6 +95,8 @@ class Train(object):
 		else:
 			epochs = experiment.header.params.get('epochs', 20)
 
+		logger.info("Fit model")
+
 		# Once I've worked out Python multithreading conflicts we can introduce workers > 0
 		model.fit_generator(
 			generator=dataset.train_generator,
@@ -136,9 +138,10 @@ class Train(object):
 			print(classification_report(y_test, y_pred))
 			
 
-		if params.verbose > 1: # and score[1] < 1.0
+		if params.print_weights:
 			for layer in model.layers:
-				print(f"Layer {layer.name} {layer.get_weights()}")
+				for var, weight in zip(layer.weights, layer.get_weights()):
+					print(f"{var.name} {weight}")
 
 		return score
 
