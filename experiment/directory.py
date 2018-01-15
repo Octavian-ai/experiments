@@ -1,5 +1,4 @@
-from data_sets.synthetic_review_prediction import EXPERIMENT_1_DATASET, \
-	EXPERIMENT_2_DATASET, EXPERIMENT_3_DATASET, EXPERIMENT_4_DATASET
+from data_sets.synthetic_review_prediction import *
 
 from basic_types import NanoType
 
@@ -257,7 +256,7 @@ directory = {
 
 
 		""",
-		EXPERIMENT_4_DATASET,
+		EXPERIMENT_5_DATASET,
 		"""
 			MATCH p=
 				(person:PERSON) -->
@@ -268,10 +267,10 @@ directory = {
 		""",
 		"binary_crossentropy",
 		{
-			"product_count": 160, #160,
-			"person_count": 1600, #1600,
-			"style_width": 2,
-			"epochs": 5,
+			"product_count": 160,
+			"person_count": 1200,
+			"style_width": 6,
+			"epochs": 10,
 			"batch_per_epoch": 400
 		}
 	),

@@ -142,9 +142,11 @@ class Train(object):
 			y_correct = np.less(np.abs(y_true - y_pred), 0.1)
 			accuracy = np.count_nonzero(y_correct) / np.size(y_correct) * 100
 			# print(f"y_delta\n {np.around(y_true - y_pred,2)}")
+			
+			print(f"y_true\n  {y_true}")
+			print(f"y_pred\n {y_pred}")
+
 			print(f"ACTUAL accuracy {round(accuracy, 1)}%")
-			# print(f"y_true\n  {y_true}")
-			# print(f"y_pred\n {y_pred}")
 
 		return score
 

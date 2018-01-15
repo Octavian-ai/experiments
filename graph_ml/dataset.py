@@ -135,7 +135,7 @@ class Dataset(object):
 
 		# Calculate params for lazy data loading
 		data_path_params = {i:query_params[i] for i in experiment.header.lazy_params}
-		data_path_params["dataset_name"] = experiment.params.dataset_name
+		data_path_params["dataset_name"] = dataset_name
 
 		dataset_file = generate_data_path(experiment, '.pkl', data_path_params)
 		logger.info(f"Dataset file {dataset_file}")
@@ -223,7 +223,7 @@ class DatasetHelpers(object):
 		elif delta < 0:
 			arr = arr[:length]
 
-		assert(len(arr) == length, f"ensure_length failed to resize, {len(arr)} != {length}")
+		assert len(arr) == length, f"ensure_length failed to resize, {len(arr)} != {length}"
 
 		return arr
 
