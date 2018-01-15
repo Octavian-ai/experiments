@@ -272,7 +272,7 @@ directory = {
 			"person_count": 1600, #1600,
 			"style_width": 2,
 			"epochs": 5,
-			"batch_per_epoch": 2000
+			"batch_per_epoch": 400
 		}
 	),
 
