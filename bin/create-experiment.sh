@@ -1,3 +1,3 @@
 #!/bin/bash
 
-pipenv run python "create-experiment-$1.py"
+pipenv run python "create-experiment.py" --experiment $1

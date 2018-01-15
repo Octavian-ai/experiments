@@ -2,7 +2,7 @@ from neo4j.v1 import GraphDatabase, Driver
 from .classes import CypherQuery, QueryParams, DatasetName
 from config import config
 from lazy import lazy
-from multiprocessing import Queue, Lock
+from queue import Queue
 from multiprocessing.pool import ThreadPool
 from more_itertools import chunked
 import uuid

@@ -19,5 +19,7 @@ if __name__ == '__main__':
 			from data_sets.synthetic_review_prediction.experiment_3 import run
 		elif FLAGS.experiment == '4':
 			from data_sets.synthetic_review_prediction.experiment_4 import run
+		elif FLAGS.experiment == '5':
+			from data_sets.synthetic_review_prediction.experiment_5 import run
 			
 		run(client)

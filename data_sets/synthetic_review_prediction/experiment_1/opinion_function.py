@@ -1,9 +1,15 @@
 from ..classes import Person, Product, ReviewScore
+from numpy import ndarray
 
 
 def opinion_function(person: Person, product: Product) -> ReviewScore:
-    if person.style_preference.value.style == product.style.value.style:
-        return ReviewScore(1.0)
-    else:
-        return ReviewScore(0)
 
+    person_style = person.style_preference.value.as_np_array()
+    assert isinstance(person_style, ndarray)
+
+    product_style = product.style.value.as_np_array()
+    assert isinstance(product_style, ndarray)
+
+    review_score = float(person_style.dot(product_style))/person_style.sum()
+
+    return ReviewScore(review_score)

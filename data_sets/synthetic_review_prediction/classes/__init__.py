@@ -12,8 +12,8 @@ from .style import Style
 
 # Node Types within our business logic
 from .company import CompanyID, Company
-from .product import ProductID, Product, ProductStyle, ProductStyleEnum
-from .person import PersonID, Person, PersonMetaProperties, PersonStylePreference, PersonStylePreferenceEnum
+from .product import ProductID, Product, ProductStyle, ProductStyleEnum, ProductStyleVector
+from .person import PersonID, Person, PersonMetaProperties, PersonStylePreference, PersonStylePreferenceEnum, PersonStylePreferenceVector
 from .review import Review, ReviewScore, ReviewID
 
 # Edge Types within our business logic
