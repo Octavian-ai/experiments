@@ -165,6 +165,10 @@ class Model(object):
 			scores = Adjacency(pe_c, pr_c, style_width, name="hidden_to_adj")(adj_con)
 			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
 
+			model.compile(loss='mean_squared_error',
+				optimizer=keras.optimizers.SGD(lr=0.3),
+				metrics=['accuracy'])
+
 
 
 		# Compile time!

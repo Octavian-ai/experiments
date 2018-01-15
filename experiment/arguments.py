@@ -19,6 +19,7 @@ class Arguments(object):
 
 		parser.add_argument('--golden', action='store_true')
 		parser.add_argument('--not-lazy', dest='lazy', action='store_false')
+		parser.add_argument('--no-say', dest='say_result', action='store_false')
 		parser.add_argument('--load-weights', action='store_true')
 		parser.add_argument('--print-weights', action='store_true')
 

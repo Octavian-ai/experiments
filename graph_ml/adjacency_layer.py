@@ -13,24 +13,45 @@ class Adjacency(Layer):
 
 	def build(self, input_shape):
 		# Create a trainable weight variable for this layer.
-		self.person_var = self.add_weight(name='people', 
+		self.person = self.add_weight(name='people', 
 			shape=(self.person_count, self.style_width),
 			initializer='uniform',
 			trainable=True)
 
-		self.product_var = self.add_weight(name='product', 
+		self.product = self.add_weight(name='product', 
 			shape=(self.product_count, self.style_width),
 			initializer='uniform',
+			trainable=True)
+
+		self.w1 = self.add_weight(name='w1', 
+			shape=(1,),
+			initializer='one',
+			trainable=True)
+
+		self.b1 = self.add_weight(name='b1', 
+			shape=(1,),
+			initializer='zero',
+			trainable=True)
+
+		self.w2 = self.add_weight(name='w2', 
+			shape=(1,),
+			initializer='one',
+			trainable=True)
+
+		self.b2 = self.add_weight(name='b2', 
+			shape=(1,),
+			initializer='zero',
 			trainable=True)
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
 	def call(self, x):
-		# print("x ", x.shape)
-		proj = K.dot(self.product_var, K.transpose(self.person_var))
-		# print("proj ", proj.shape)
+		proj = K.dot(self.product, K.transpose(self.person))
 		mul = proj * x
-		# print("mul", mul.shape)
+		mul = mul * self.w1 + self.b1
+		mul = K.sigmoid(mul)
+		mul = mul * self.w2 + self.b2
+
 		return mul
 
 	def compute_output_shape(self, input_shape):

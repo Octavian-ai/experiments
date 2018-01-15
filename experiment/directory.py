@@ -266,12 +266,13 @@ directory = {
 			RETURN 
 				person.id as person_id, review.score as score, product.id as product_id
 		""",
-		float,
+		"binary_crossentropy",
 		{
-			"product_count": 160,
-			"person_count": 1600,
-			"style_width": 1,
-			"epochs": 5
+			"product_count": 160, #160,
+			"person_count": 1600, #1600,
+			"style_width": 2,
+			"epochs": 5,
+			"batch_per_epoch": 2000
 		}
 	),
 

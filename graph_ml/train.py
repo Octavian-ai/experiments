@@ -122,26 +122,29 @@ class Train(object):
 			use_multiprocessing=False,
 		)
 
-		generate_classification_report = False
-		if generate_classification_report:
-			data_test = list(itertools.islice(dataset.test_generator, dataset.test_steps))
-			y_test = [i[1] for i in data_test]
-
-			y_pred = model.predict_generator(
-				generator=dataset.test_generator,
-				steps=dataset.test_steps,
-				workers=0,
-				use_multiprocessing=False,
-			)
-			y_pred = list(y_pred)
-			# TODO: I need to de-sequence the data to make this work
-			print(classification_report(y_test, y_pred))
-			
 
 		if params.print_weights:
 			for layer in model.layers:
 				for var, weight in zip(layer.weights, layer.get_weights()):
-					print(f"{var.name} {weight}")
+					print(f"{var.name} {np.around(weight, decimals=2)}")
+
+
+			print("Prediction:")
+			y_pred = model.predict_generator(
+				generator=dataset.test_generator,
+				steps=1,
+				workers=0,
+				use_multiprocessing=False,
+			)
+			y_pred = np.array(y_pred[0])
+			y_true = np.array(next(dataset.test_generator)[1][0])
+
+			y_correct = np.less(np.abs(y_true - y_pred), 0.1)
+			accuracy = np.count_nonzero(y_correct) / np.size(y_correct) * 100
+			# print(f"y_delta\n {np.around(y_true - y_pred,2)}")
+			print(f"ACTUAL accuracy {round(accuracy, 1)}%")
+			# print(f"y_true\n  {y_true}")
+			# print(f"y_pred\n {y_pred}")
 
 		return score
 

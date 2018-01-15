@@ -46,14 +46,16 @@ class Experiment(object):
 		print(Fore.YELLOW)
 		print("#######################################################################")
 		print("Experiment results")
-		print(f"{experiment.name} test loss {score[0]}")
-		print(f"{experiment.name} test accuracy {score[1]}")
+		print(f"{experiment.name} test loss {round(score[0],6)}")
+		print(f"{experiment.name} test accuracy {round(score[1])}%")
 		print("#######################################################################")
 		print(Style.RESET_ALL)
 
 		# t = '-title {!r}'.format(title)
 		# s = '-subtitle {!r}'.format(subtitle)
 		# m = '-message {!r}'.format(message)
-		os.system(f"terminal-notifier -message 'test accuracy {round(score[1]*100)}%' -title Octavian")
-		os.system(f"say test accuracy {round(score[1]*100)} percent")
+		os.system(f"terminal-notifier -message 'test accuracy {round(score[1]*100)}%  loss {round(score[0],2)}' -title Octavian")
+
+		if params.say_result:
+			os.system(f"say test accuracy {round(score[1]*100)} percent")
 		

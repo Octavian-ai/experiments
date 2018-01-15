@@ -440,7 +440,7 @@ class DatasetHelpers(object):
 				return 1.0 if person in person_product and product in person_product[person] else 0.0
 
 			def score(person, product):
-				return person_product.get(person, -1).get(product, -1) 
+				return person_product.get(person, 0.0).get(product, 0.0) 
 
 			pr_c = experiment.header.params["product_count"]
 			pe_c = experiment.header.params["person_count"]
@@ -449,6 +449,9 @@ class DatasetHelpers(object):
 
 			logger.info(f"People returned {len(people)} of capacity {pe_c}")
 			logger.info(f"Products returned {len(products)} of capacity {pr_c}")
+
+			people   = sorted(list(people))[:pe_c]
+			products = sorted(list(products))[:pr_c]
 
 			def build(fn):
 				return DatasetHelpers.ensure_length(np.array([
@@ -460,13 +463,13 @@ class DatasetHelpers(object):
 			adj_score = build(score)
 			adj_con = build(exists)
 
-			# print(adj_score)
-			# print(adj_con)
+			print("Connections:",adj_con)
+			print("Scores:",adj_score)
 
 			assert_mtx_shape(adj_score, shape, "adj_score")
 			assert_mtx_shape(adj_con,   shape)
 
-			for i in range(bs):
+			for i in range(bs * experiment.header.params["batch_per_epoch"]):
 				yield Point(adj_con, adj_score)
 
 
