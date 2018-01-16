@@ -166,8 +166,8 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
 
-			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.SGD(lr=5000),
+			model.compile(loss=keras.losses.mean_absolute_error,
+				optimizer=keras.optimizers.Adam(lr=0.9, decay=0.01),
 				metrics=['accuracy'])
 
 			return model
