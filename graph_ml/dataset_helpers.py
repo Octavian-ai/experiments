@@ -316,18 +316,26 @@ class DatasetHelpers(object):
 			reviews_per_person = Counter()
 			reviews_per_product = Counter()
 
+			pr_c = experiment.header.params["product_count"]
+			pe_c = experiment.header.params["person_count"]
+			bs = experiment.params.batch_size
+			shape = (pr_c, pe_c)
+
 			# Construct adjacency dict
 			for i in data:
 				if i["person_id"] not in person_product:
 					person_product[i["person_id"]] = {}
 
-				person_product[i["person_id"]][i["product_id"]] = i["score"]
+				if len(people) < pe_c or i["person_id"] in people:
+					if len(products) < pr_c or i["product_id"] in products:
 
-				reviews_per_person[i["person_id"]] += 1
-				reviews_per_product[i["product_id"]] += 1
+						person_product[i["person_id"]][i["product_id"]] = i["score"]
 
-				products.add(i["product_id"])
-				people.add(i["person_id"])
+						reviews_per_person[i["person_id"]] += 1
+						reviews_per_product[i["product_id"]] += 1
+
+						products.add(i["product_id"])
+						people.add(i["person_id"])
 
 			def exists(person, product):
 				return 1.0 if person in person_product and product in person_product[person] else 0.0
@@ -335,16 +343,11 @@ class DatasetHelpers(object):
 			def score(person, product):
 				return person_product.get(person, 0.0).get(product, 0.0) 
 
-			# ppe = list(dict(reviews_per_person).values())
-			# ppr = list(dict(reviews_per_product).values())
+			ppe = list(dict(reviews_per_person).values())
+			ppr = list(dict(reviews_per_product).values())
 
-			# print("Reviews per product: ", np.histogram(ppe) )
-			# print("Reviews per person: ", np.histogram(ppr) )
-
-			pr_c = experiment.header.params["product_count"]
-			pe_c = experiment.header.params["person_count"]
-			bs = experiment.params.batch_size
-			shape = (pr_c, pe_c)
+			print("Reviews per product: ", np.histogram(ppe) )
+			print("Reviews per person: ", np.histogram(ppr) )
 
 			logger.info(f"People returned {len(people)} of capacity {pe_c}")
 			logger.info(f"Products returned {len(products)} of capacity {pr_c}")

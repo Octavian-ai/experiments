@@ -267,8 +267,8 @@ directory = {
 		""",
 		"binary_crossentropy",
 		{
-			"product_count": 16, # total 160
-			"person_count": 120, # total 1200
+			"product_count": 20, # total 160
+			"person_count": 20, # total 1200
 			"style_width": 1,
 			"epochs": 50,
 			"batch_per_epoch": 200

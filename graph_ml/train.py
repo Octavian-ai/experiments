@@ -41,25 +41,55 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 			logger.info("Epoch {}: early stopping {} > {}".format(self.stopped_epoch+1, self.monitor, self.value))
 
 
-class TraceCallback(keras.callbacks.Callback):
-	def __init__(self, ):
+class SpecialValidator(keras.callbacks.Callback):
+	def __init__(self, experiment, dataset, model):
+		self.experiment = experiment
+		self.model = model
+		self.dataset = dataset
 		super(keras.callbacks.Callback, self).__init__()
 
-	def on_epoch_start(self, epoch, logs={}):
-		logger.info(f"Epoch {epoch} start")
+	
+	def on_train_end(self, logs):
+		self.test()
 
-	def on_epoch_end(self, epoch, logs={}):
-		logger.info("Epoch end")
+	def on_epoch_end(self, epoch, logs):
+		self.test()
 
-	def on_train_end(self, logs=None):
-		logger.info("Train end")
+	def test(self):
+		print() # Clear from epoch status bar
+		for (label, genie) in self.dataset.generator.items():
+			# print(f"Prediction for {label}")
 
-	# def on_batch_end(self, batch_index, logs):
-	# 	logger.info("Batch end")
+			row = genie.peek()
+			y_true = row[1][0]
+			x_test = row[0][0]
 
-	# def on_batch_begin(self, batch_index, logs):
-	# 	logger.info("Batch begin " + batch_index)
-		
+			y_pred = self.model.predict_generator(
+				generator=genie,
+				steps=1,
+				workers=0,
+				use_multiprocessing=False,
+			)
+			y_pred = np.array(y_pred[0])
+
+			y_correct = np.isclose(y_pred, y_true, atol=0.1)
+			y_zero = np.isclose(y_pred, 0, atol=0.1)
+			y_masked = np.where(np.greater(x_test, 0.1), y_correct, False)
+
+			# print("x_test: ",x_test)
+			# print("y_true: ", y_true)
+			# print("y_pred: ", np.around(y_pred, 1))
+			# print("y_correct: ",y_correct)
+			# print(f"y_masked {np.count_nonzero(y_masked)} / {np.count_nonzero(y_correct)} / {np.count_nonzero(x_test)}")
+			
+			net_accuracy = round(np.count_nonzero(y_masked) / (np.count_nonzero(x_test)+0.001) * 100, 3)
+			gross_accuracy = round(np.count_nonzero(y_correct) / np.size(y_correct) * 100, 3)
+
+			print(f"{label} accuracy {net_accuracy}%")
+			# print()
+
+
+
 
 
 class Train(object):
@@ -82,7 +112,7 @@ class Train(object):
 
 		callbacks = [
 			StopEarlyIfAbove(verbose=params.verbose),
-			# TraceCallback(),
+			SpecialValidator(experiment, dataset, model),
 			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
 			# keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
 			keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.0000001, patience=8, verbose=0, mode='auto')
@@ -128,39 +158,6 @@ class Train(object):
 				for var, weight in zip(layer.weights, layer.get_weights()):
 					print(f"{var.name} {np.around(weight, decimals=2)}")
 
-
-		if params.custom_test:
-			
-			for (label, genie) in dataset.generator.items():
-				# print(f"Prediction for {label}")
-
-				row = genie.peek()
-				y_true = row[1][0]
-				x_test = row[0][0]
-
-				y_pred = model.predict_generator(
-					generator=genie,
-					steps=1,
-					workers=0,
-					use_multiprocessing=False,
-				)
-				y_pred = np.array(y_pred[0])
-
-				y_correct = np.isclose(y_pred, y_true, atol=0.1)
-				y_zero = np.isclose(y_pred, 0, atol=0.1)
-				y_masked = np.where(np.greater(x_test, 0.1), y_correct, False)
-
-				# print("x_test: ",x_test)
-				# print("y_true: ", y_true)
-				# print("y_pred: ", np.around(y_pred, 1))
-				# print("y_correct: ",y_correct)
-				# print(f"y_masked {np.count_nonzero(y_masked)} / {np.count_nonzero(y_correct)} / {np.count_nonzero(x_test)}")
-				
-				net_accuracy = round(np.count_nonzero(y_masked) / (np.count_nonzero(x_test)+0.001) * 100, 3)
-				gross_accuracy = round(np.count_nonzero(y_correct) / np.size(y_correct) * 100, 3)
-
-				print(f"{label} gross accuracy {gross_accuracy}%  net_accuracy {net_accuracy}%")
-				# print()
 
 		return score
 
