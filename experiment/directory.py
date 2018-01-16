@@ -256,7 +256,7 @@ directory = {
 
 
 		""",
-		EXPERIMENT_5_DATASET,
+		EXPERIMENT_4_DATASET,
 		"""
 			MATCH p=
 				(person:PERSON) -->
@@ -267,11 +267,11 @@ directory = {
 		""",
 		"binary_crossentropy",
 		{
-			"product_count": 160,
-			"person_count": 1200,
-			"style_width": 6,
-			"epochs": 10,
-			"batch_per_epoch": 400
+			"product_count": 16, # total 160
+			"person_count": 120, # total 1200
+			"style_width": 1,
+			"epochs": 50,
+			"batch_per_epoch": 200
 		}
 	),
 

@@ -85,7 +85,7 @@ class Train(object):
 			# TraceCallback(),
 			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
 			# keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
-			# keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0.0001, patience=4, verbose=0, mode='auto')
+			keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.0000001, patience=8, verbose=0, mode='auto')
 		]
 
 		# TODO: move to more general overriding mechanism
@@ -129,24 +129,38 @@ class Train(object):
 					print(f"{var.name} {np.around(weight, decimals=2)}")
 
 
-			print("Prediction:")
-			y_pred = model.predict_generator(
-				generator=dataset.test_generator,
-				steps=1,
-				workers=0,
-				use_multiprocessing=False,
-			)
-			y_pred = np.array(y_pred[0])
-			y_true = np.array(next(dataset.test_generator)[1][0])
-
-			y_correct = np.less(np.abs(y_true - y_pred), 0.1)
-			accuracy = np.count_nonzero(y_correct) / np.size(y_correct) * 100
-			# print(f"y_delta\n {np.around(y_true - y_pred,2)}")
+		if params.custom_test:
 			
-			print(f"y_true\n  {y_true}")
-			print(f"y_pred\n {y_pred}")
+			for (label, genie) in dataset.generator.items():
+				# print(f"Prediction for {label}")
 
-			print(f"ACTUAL accuracy {round(accuracy, 1)}%")
+				row = genie.peek()
+				y_true = row[1][0]
+				x_test = row[0][0]
+
+				y_pred = model.predict_generator(
+					generator=genie,
+					steps=1,
+					workers=0,
+					use_multiprocessing=False,
+				)
+				y_pred = np.array(y_pred[0])
+
+				y_correct = np.isclose(y_pred, y_true, atol=0.1)
+				y_zero = np.isclose(y_pred, 0, atol=0.1)
+				y_masked = np.where(np.greater(x_test, 0.1), y_correct, False)
+
+				# print("x_test: ",x_test)
+				# print("y_true: ", y_true)
+				# print("y_pred: ", np.around(y_pred, 1))
+				# print("y_correct: ",y_correct)
+				# print(f"y_masked {np.count_nonzero(y_masked)} / {np.count_nonzero(y_correct)} / {np.count_nonzero(x_test)}")
+				
+				net_accuracy = round(np.count_nonzero(y_masked) / (np.count_nonzero(x_test)+0.001) * 100, 3)
+				gross_accuracy = round(np.count_nonzero(y_correct) / np.size(y_correct) * 100, 3)
+
+				print(f"{label} gross accuracy {gross_accuracy}%  net_accuracy {net_accuracy}%")
+				# print()
 
 		return score
 

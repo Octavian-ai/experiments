@@ -22,6 +22,7 @@ class Arguments(object):
 		parser.add_argument('--no-say', dest='say_result', action='store_false')
 		parser.add_argument('--load-weights', action='store_true')
 		parser.add_argument('--print-weights', action='store_true')
+		parser.add_argument('--custom-test', action='store_true')
 
 		parser.add_argument('--output-dir', type=str, default="./output")
 		parser.add_argument('--data-dir', type=str, default="./data")
