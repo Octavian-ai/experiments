@@ -267,11 +267,11 @@ directory = {
 		""",
 		"binary_crossentropy",
 		{
-			"product_count": 20, # total 160
-			"person_count": 20, # total 1200
-			"style_width": 1,
-			"epochs": 50,
-			"batch_per_epoch": 200
+			"product_count": 160, # total 160
+			"person_count": 1200, # total 1200
+			"style_width": 6,
+			"epochs": 5000,
+			"batch_per_epoch": 10
 		}
 	),
 

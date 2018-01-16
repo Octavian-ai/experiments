@@ -163,11 +163,14 @@ class Model(object):
 
 			adj_con = Input(batch_shape=(bs, pr_c, pe_c), dtype='float32', name="adj_con")
 			scores = Adjacency(pe_c, pr_c, style_width, name="hidden_to_adj")(adj_con)
+
 			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
 
-			model.compile(loss='mean_squared_error',
-				optimizer=keras.optimizers.SGD(lr=0.3),
+			model.compile(loss=keras.losses.mean_squared_error,
+				optimizer=keras.optimizers.SGD(lr=5000),
 				metrics=['accuracy'])
+
+			return model
 
 
 

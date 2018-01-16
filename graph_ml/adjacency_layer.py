@@ -33,14 +33,14 @@ class Adjacency(Layer):
 		# Create a trainable weight variable for this layer.
 		self.person = self.add_weight(name='people', 
 			shape=(self.person_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=1),
+			initializer=initializers.RandomUniform(minval=0, maxval=0),
 			# initializer='ones',
 			# regularizer=PD(),
 			trainable=True)
 
 		self.product = self.add_weight(name='product', 
 			shape=(self.product_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=1),
+			initializer=initializers.RandomUniform(minval=0, maxval=0),
 			# initializer='ones',
 			# regularizer=PD(),
 			trainable=True)
@@ -68,22 +68,38 @@ class Adjacency(Layer):
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
 	def call(self, x):
-		# pr = K.softmax(self.product)
-		# pe = K.softmax(self.person)
+		pr = self.product
+		pe = self.person
 
-		pr = K.concatenate([
-			self.product, 
-			1.0 - self.product
-		], axis=1)
+
+		#pr = K.concatenate([
+		#	self.product,
+		#	1.0 - self.product
+		#], axis=1)
 		
-		pe = K.concatenate([
-			self.person, 
-			1.0 - self.person
-		], axis=1)
+		#pe = K.concatenate([
+		#	self.person,
+		#	1.0 - self.person
+		#], axis=1)
 
 		# proj = K.dot(self.product, K.transpose(self.person))
-		proj = K.dot(pr, K.transpose(pe))
-		
+
+		#pr += (1 - pr) * K.random_normal(shape=K.shape(pr),
+		#					 mean=0,
+		#					 stddev=0.2)
+
+		#pe += (1 - pe) * K.random_normal(shape=K.shape(pe),
+		#					 mean=0,
+		#					 stddev=0.2)
+
+		wts = self.get_weights()
+		temp_pe = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
+		temp_pr = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
+		self.set_weights([np.array(temp_pe, dtype=np.float32), np.array(temp_pr, dtype=np.float32)])
+
+
+		proj = K.dot(pr, K.transpose(pe))# + self.noise
+
 		mul = proj * x
 		# mul = mul * self.w1 + self.b1
 		# mul = K.sigmoid(mul)

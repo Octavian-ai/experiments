@@ -387,6 +387,9 @@ class DatasetHelpers(object):
 				for (k, v) in masks.items()
 			}
 
+			for k, v in datas.items():
+				print(k, np.sum(v.x), np.sum(v.y), 1.0 - np.sum(v.y)/np.prod(shape), np.sum(np.multiply(v.x, v.y)))
+
 			# print(datas)
 
 			for i in range(bs * experiment.header.params["batch_per_epoch"]):
