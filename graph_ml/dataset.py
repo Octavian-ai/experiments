@@ -27,8 +27,6 @@ from .dataset_helpers import *
 logger = logging.getLogger(__name__)
 
 
-
-
 class Dataset(object):
 
 
