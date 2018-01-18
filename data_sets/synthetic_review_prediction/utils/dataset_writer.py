@@ -10,7 +10,12 @@ from uuid import UUID
 class DatasetWriter(object):
     ADDITIONAL_NODE_PROPERTIES: Set[AnyStr] = {'id'}
 
-    def __init__(self, client: SimpleNodeClient, dataset_name: DatasetName):
+    def __init__(self,
+                 client: SimpleNodeClient,
+                 dataset_name: DatasetName,
+                 properties_to_ignore: Set[str] = set()
+                 ):
+        self.properties_to_ignore = properties_to_ignore
         self.dataset_name = dataset_name
         self._client = client
         self.pool = ThreadPool(1)
@@ -28,8 +33,7 @@ class DatasetWriter(object):
         query = CypherQuery("MATCH (n:NODE {dataset_name: $dataset_name}) DETACH DELETE n")
         self._client.execute_cypher_write(query, QueryParams(dataset_name=self.dataset_name))
 
-
-    def create_node_if_not_exists(self, node: GraphNode, properties: Set[AnyStr]): # TODO: define properties on the node entity itself?
+    def create_node_if_not_exists(self, node: GraphNode, properties: Set[AnyStr]):  # TODO: define properties on the node entity itself?
         properties = properties.union(self.ADDITIONAL_NODE_PROPERTIES)
 
         query_params = self._get_properties_for_query(node, properties)
@@ -58,8 +62,10 @@ class DatasetWriter(object):
 
     def _get_properties_for_query(self, node, properties, prefix=None):
         properties.add('is_golden')
-        print(properties)
-        properties_dict = {name if not prefix else f"{prefix}_{name}": getattr(node, name) for name in properties}
+
+        properties_dict = {
+            name if not prefix else f"{prefix}_{name}": getattr(node, name) for name in properties if name not in self.properties_to_ignore
+        }
 
         query_params = QueryParams(dataset_name=self.dataset_name, **properties_dict)
         return query_params
