@@ -74,7 +74,9 @@ class SpecialValidator(keras.callbacks.Callback):
 
 			y_correct = np.isclose(y_pred, y_true, atol=0.1)
 			y_zero = np.isclose(y_pred, 0, atol=0.1)
-			y_masked = np.where(np.greater(x_test, 0.1), y_correct, False)
+			y_true_set_and_in_mask = np.where(np.greater(y_true, 0.1), np.greater(x_test, 0.1), False)
+			y_masked = np.where(y_true_set_and_in_mask, y_correct, False)
+			y_masked_david = np.where(np.greater(x_test, 0.1), y_correct, False)
 
 			# print("x_test: ",x_test)
 			# print("y_true: ", y_true)
@@ -82,10 +84,11 @@ class SpecialValidator(keras.callbacks.Callback):
 			# print("y_correct: ",y_correct)
 			# print(f"y_masked {np.count_nonzero(y_masked)} / {np.count_nonzero(y_correct)} / {np.count_nonzero(x_test)}")
 			
-			net_accuracy = round(np.count_nonzero(y_masked) / (np.count_nonzero(x_test)+0.001) * 100, 3)
+			net_accuracy = round(np.count_nonzero(y_masked) / (np.count_nonzero(y_true_set_and_in_mask)+0.001) * 100, 3)
+			net_accuracy_david = round(np.count_nonzero(y_masked_david) / (np.count_nonzero(x_test)+0.001) * 100, 3)
 			gross_accuracy = round(np.count_nonzero(y_correct) / np.size(y_correct) * 100, 3)
 
-			print(f"{label} accuracy {net_accuracy}%")
+			print(f"{label} accuracy {net_accuracy}% ({net_accuracy_david}%)")
 			# print()
 
 
@@ -111,11 +114,11 @@ class Train(object):
 			model.load_weights(params_file)
 
 		callbacks = [
-			StopEarlyIfAbove(verbose=params.verbose),
+			#StopEarlyIfAbove(verbose=params.verbose),
 			SpecialValidator(experiment, dataset, model),
 			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
 			# keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
-			keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.0000001, patience=8, verbose=0, mode='auto')
+			#keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.000000001, patience=8, verbose=0, mode='auto')
 		]
 
 		# TODO: move to more general overriding mechanism

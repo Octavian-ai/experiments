@@ -64,7 +64,7 @@ class Model(object):
 
 
 		elif experiment.name == "review_from_hidden_style_neighbor_conv":
-			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(n_sequence,n_styles*2,), dtype='float32', name='neighbors')
 			person = Input(shape=(n_styles,), dtype='float32', name='person')
 
 			m = cls.style_from_neighbors(neighbors, n_styles, n_sequence)
@@ -166,8 +166,8 @@ class Model(object):
 
 			model = keras.models.Model(inputs=[adj_con], outputs=[features])
 
-			model.compile(loss=keras.losses.mean_absolute_error,
-				optimizer=keras.optimizers.Adam(lr=0.9, decay=0.01),
+			model.compile(loss=keras.losses.mean_squared_error,
+				optimizer=keras.optimizers.Adam(lr=1.5, decay=0.01),
 				metrics=['accuracy'])
 
 			return model

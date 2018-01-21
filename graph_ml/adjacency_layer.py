@@ -2,6 +2,7 @@ from keras import backend as K
 import tensorflow as tf
 from keras.engine.topology import Layer, Input
 from keras import regularizers, initializers, layers, activations
+from functools import partial
 import numpy as np
 
 class PD(regularizers.Regularizer):
@@ -22,6 +23,17 @@ class PD(regularizers.Regularizer):
 		return {'a': float(self.a), 'b': float(self.b)}
 
 
+class Clip(regularizers.Regularizer):
+	def __init__(self, max=1):
+		self.max = max
+
+	def __call__(self, x):
+		K.clip(x, min_value=-1, max_value=1)
+
+	def get_config(self):
+		return {'max': float(self.max)}
+
+
 def cartesian_product_matrix(a, b):
 	tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0], 1])
 	tile_a = tf.expand_dims(tile_a, 2)
@@ -40,9 +52,9 @@ class Adjacency(Layer):
 		self.person_count = person_count
 		self.product_count = product_count
 		self.style_width = style_width
-		self.dense1 = layers.Dense(units=(style_width+2), activation=activations.softplus)
+		self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
 		#self.dense2 = layers.(units=(1), activation=activations.linear)
-		self.dense3 = layers.Dense(units=1, activation=activations.sigmoid)
+		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
 		super(Adjacency, self).__init__(**kwargs)
 
 	def __call__(self, inputs, **kwargs):
