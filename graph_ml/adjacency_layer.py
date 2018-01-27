@@ -39,17 +39,10 @@ class Adjacency(Layer):
 
 	def __init__(self, person_count, product_count, style_width, **kwargs):
 
-		self.use_legacy_1 = True
-		self.use_legacy_2 = True
-
 		self.person_count = person_count
 		self.product_count = product_count
 		self.style_width = style_width
 
-		if self.use_legacy_1 or self.use_legacy_2:
-			self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
-			self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
-		
 		super(Adjacency, self).__init__(**kwargs)
 
 	def jitter_weights(self, idx_to_jitter, radius=0.2):
@@ -72,21 +65,6 @@ class Adjacency(Layer):
 		return cartesian_product
 
 
-	def __call__(self, inputs, **kwargs):
-		if self.use_legacy_2 or self.use_legacy_1:
-			product_ct = inputs.shape[1]
-			person_ct = inputs.shape[2]
-			my_batch = product_ct * person_ct
-
-			self.inner_input = Input(batch_shape=(product_ct, person_ct, 2, self.style_width), dtype='float32', name="inner_d0")
-			self.reshaped_to_look_like_a_batch = K.reshape(self.inner_input, (product_ct * person_ct, 2 * self.style_width))
-			self.dense1_called = self.dense1(self.reshaped_to_look_like_a_batch)
-			self.dense3_called = self.dense3(self.dense1_called)
-			self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
-		
-		return super(Adjacency, self).__call__(inputs, **kwargs)
-
-
 	def build(self, input_shape):
 		self.batch_size = input_shape[0]
 
@@ -101,30 +79,28 @@ class Adjacency(Layer):
 			initializer='zero',
 			trainable=True)
 
-		if not self.use_legacy_1:
-			# self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
-			self.w1 = self.add_weight(name='w1', 
-				shape=(2 * self.style_width, 
-						self.style_width),
-				initializer='ones',
-				regularizer=Clip(),
-				trainable=True)
+		self.w1 = self.add_weight(name='w1', 
+			shape=(2 * self.style_width, 
+					self.style_width),
+			initializer='glorot_uniform',
+			regularizer=Clip(),
+			trainable=True)
 
 
-		if not self.use_legacy_2:
-			# self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
-			self.w2 = self.add_weight(name='w2', 
-				shape=(self.style_width, 1),
-				initializer='ones', # glorot_uniform
-				trainable=True,
-				regularizer=Clip())
-
+		self.w2 = self.add_weight(name='w2', 
+			shape=(self.style_width, 1),
+			initializer='glorot_uniform', # glorot_uniform
+			trainable=True,
+			regularizer=Clip())
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
 	def call_simple(self, x): 
+		self.jitter_weights(idx_to_jitter=[0, 1])
+
 		proj = K.dot(self.product, K.transpose(self.person))
 		mul = proj * x
+		
 		return mul
 
 	def call(self, x):
@@ -132,19 +108,12 @@ class Adjacency(Layer):
 
 		all_pairs = self.cartesian_product_matrix(self.product, self.person)
 		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
+	
+		m = K.dot(flat, self.w1)
+		m = K.softplus(m)
 
-		if self.use_legacy_1:
-			m = self.dense1.call(flat)
-		else:
-			m = K.dot(flat, self.w1)
-			m = K.softplus(m)
-
-		if self.use_legacy_2:
-			m = self.dense3.call(m)
-		else:
-			m = K.dot(m, self.w2)
-			m = K.relu(m, alpha=0.1)
-
+		m = K.dot(m, self.w2)
+		m = K.relu(m, alpha=0.1)
 
 		m = K.reshape(m, (1, self.product_count, self.person_count))
 		mul = m * x
