@@ -1,5 +1,4 @@
-from data_sets.synthetic_review_prediction import *
-
+from data_sets import *
 from basic_types import NanoType
 
 from .experiment_header import ExperimentHeader
@@ -256,7 +255,7 @@ directory = {
 
 
 		""",
-		EXPERIMENT_4_DATASET,
+		EXPERIMENT_5_DATASET,
 		"""
 			MATCH p=
 				(person:PERSON) -->
@@ -265,12 +264,12 @@ directory = {
 			RETURN 
 				person.id as person_id, review.score as score, product.id as product_id
 		""",
-		"binary_crossentropy",
+		"adj_equals",
 		{
 			"product_count": 160, # total 160
 			"person_count": 1200, # total 1200
-			"style_width": 6,
-			"epochs": 5000,
+			"style_width": 20,
+			"epochs": 20,
 			"batch_per_epoch": 10
 		}
 	),

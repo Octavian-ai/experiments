@@ -103,7 +103,6 @@ class Adjacency(Layer):
 		pr = self.product
 		pe = self.person
 
-
 		#pr = K.concatenate([
 		#	self.product,
 		#	1.0 - self.product
@@ -113,16 +112,6 @@ class Adjacency(Layer):
 		#	self.person,
 		#	1.0 - self.person
 		#], axis=1)
-
-		# proj = K.dot(self.product, K.transpose(self.person))
-
-		#pr += (1 - pr) * K.random_normal(shape=K.shape(pr),
-		#					 mean=0,
-		#					 stddev=0.2)
-
-		#pe += (1 - pe) * K.random_normal(shape=K.shape(pe),
-		#					 mean=0,
-		#					 stddev=0.2)
 
 		wts = self.get_weights()
 		temp_pe = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
