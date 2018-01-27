@@ -88,26 +88,18 @@ class Adjacency(Layer):
 			# regularizer=PD(),
 			trainable=True)
 
-
 		# self.w1 = self.add_weight(name='w1', 
-		# 	shape=(1,),
-		# 	initializer='one',
-		# 	trainable=True)
-
-		# self.b1 = self.add_weight(name='b1', 
-		# 	shape=(1,),
-		# 	initializer='zero',
+		# 	shape=(2 * self.style_width, 
+		# 			self.style_width),
+		# 	initializer='glorot_uniform',
+		# 	regularizer=Clip(),
 		# 	trainable=True)
 
 		# self.w2 = self.add_weight(name='w2', 
-		# 	shape=(1,),
-		# 	initializer='one',
-		# 	trainable=True)
-
-		# self.b2 = self.add_weight(name='b2', 
-		# 	shape=(1,),
-		# 	initializer='zero',
-		# 	trainable=True)
+		# 	shape=(self.style_width, 1),
+		# 	initializer='glorot_uniform', # glorot_uniform
+		# 	trainable=True,
+		# 	regularizer=Clip())
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
@@ -137,25 +129,30 @@ class Adjacency(Layer):
 		#					 stddev=0.2)
 
 		wts = self.get_weights()
-		temp_pe = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
-		temp_pr = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
-		self.set_weights([np.array(temp_pe, dtype=np.float32), np.array(temp_pr, dtype=np.float32)])
+		wts[0] = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
+		wts[1] = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
+		self.set_weights(wts)
 
 		all_pairs = cartesian_product_matrix(pr, pe)
 
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
 
-		#inner = self.inner_input.call(all_pairs)
-		hidden = self.dense1.call(K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width)))
-		#proj = self.dense2.call(hidden)
+		hidden = self.dense1.call(flat)
+		# WHY does using this instead of dense1 fail ?!
+		# hidden = K.dot(flat, self.w1)
+		# hidden = K.softplus(hidden)
+
+
 		proj = self.dense3.call(hidden)
+		# WHY does using this instead of dense3 fail ?!
+		# proj = K.dot(hidden, self.w2)
+		# proj = K.relu(proj, alpha=0.1)
+
 		proj = K.reshape(proj, (1, self.product_count, self.person_count))
 		proj = K.tile(proj, [self.batch_size,1,1])
 		#proj = K.dot(pr, K.transpose(pe))# + self.noise
 
 		mul = proj * x
-		# mul = mul * self.w1 + self.b1
-		# mul = K.sigmoid(mul)
-		# mul = mul * self.w2 + self.b2
 
 		return mul
 
