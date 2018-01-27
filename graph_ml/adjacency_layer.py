@@ -52,18 +52,18 @@ class Adjacency(Layer):
 
 	def __init__(self, person_count, product_count, style_width, **kwargs):
 
-		self.use_legacy_1 = False
-		self.use_legacy_2 = False
+		self.use_legacy_1 = True
+		self.use_legacy_2 = True
 
 		self.person_count = person_count
 		self.product_count = product_count
 		self.style_width = style_width
 
 		# if self.use_legacy_1:
-		self.dense1 = layers.Dense(units=(style_width), kernel_initializer='ones', activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
+		self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
 	
 		# if self.use_legacy_2
-		self.dense3 = layers.Dense(units=1, kernel_initializer='ones', activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
+		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
 		
 		super(Adjacency, self).__init__(**kwargs)
 
