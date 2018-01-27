@@ -441,7 +441,6 @@ class DatasetHelpers(object):
 				"test":     np.equal(mask_seed, 0),
 				"train":    np.greater(mask_seed, 1),
 				"validate": np.equal(mask_seed, 1),
-				"all":      Point(adj_con, adj_score)
 			}
 
 			def gen_d(mask):
@@ -452,10 +451,8 @@ class DatasetHelpers(object):
 				for (k, v) in masks.items()
 			}
 
-			#for k, v in datas.items():
-			#	print(k, np.sum(v.x), np.sum(v.y), 1.0 - np.sum(v.y)/np.prod(shape), np.sum(np.multiply(v.x, v.y)))
+			datas["all"] = Point(adj_con, adj_score)
 
-			# print(datas)
 			cache.append(datas)
 
 			return gen_output(datas)
