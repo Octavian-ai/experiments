@@ -91,6 +91,9 @@ class SpecialValidator(keras.callbacks.Callback):
 			print(f"{label} accuracy {net_accuracy}% ({net_accuracy_david}%)")
 			# print()
 
+			if label == "validate" and net_accuracy == 100:
+				self.model.stop_training = True
+
 
 
 

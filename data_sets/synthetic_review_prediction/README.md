@@ -1,2 +1,0 @@
-# Synthetic Review Prediction
-

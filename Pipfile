@@ -17,6 +17,7 @@ colorama = "*"
 coloredlogs = "*"
 more-itertools = "*"
 recurrentshop = {git = "https://github.com/datalogai/recurrentshop.git"}
+generate-data = {git = "https://github.com/Octavian-ai/generate-data.git"}
 colored-traceback = "*"
 sklearn = "*"
 tqdm = "*"
