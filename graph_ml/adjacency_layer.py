@@ -79,23 +79,25 @@ class Adjacency(Layer):
 			initializer='zero',
 			trainable=True)
 
-		self.w1 = self.add_weight(name='w1', 
-			shape=(2 * self.style_width, 
-					self.style_width),
-			initializer='glorot_uniform',
-			regularizer=Clip(),
-			trainable=True)
+		
+
+		# self.w1 = self.add_weight(name='w1', 
+		# 	shape=(2 * self.style_width, 
+		# 			self.style_width),
+		# 	initializer='glorot_uniform',
+		# 	regularizer=Clip(),
+		# 	trainable=True)
 
 
-		self.w2 = self.add_weight(name='w2', 
-			shape=(self.style_width, 1),
-			initializer='glorot_uniform', # glorot_uniform
-			trainable=True,
-			regularizer=Clip())
+		# self.w2 = self.add_weight(name='w2', 
+		# 	shape=(self.style_width, 1),
+		# 	initializer='glorot_uniform', # glorot_uniform
+		# 	trainable=True,
+		# 	regularizer=Clip())
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
-	def call_simple(self, x): 
+	def call_dot(self, x): 
 		self.jitter_weights(idx_to_jitter=[0, 1])
 
 		proj = K.dot(self.product, K.transpose(self.person))
@@ -103,8 +105,8 @@ class Adjacency(Layer):
 		
 		return mul
 
-	def call(self, x):
-		self.jitter_weights(idx_to_jitter=[0, 1])
+	def call_dense(self, x):
+		self.jitter_weights(idx_to_jitter=[0, 1, 2, 3])
 
 		all_pairs = self.cartesian_product_matrix(self.product, self.person)
 		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
@@ -119,6 +121,9 @@ class Adjacency(Layer):
 		mul = m * x
 
 		return mul
+
+	def call(self, x):
+		return self.call_dot(x)
 
 	def compute_output_shape(self, input_shape):
 		return input_shape
