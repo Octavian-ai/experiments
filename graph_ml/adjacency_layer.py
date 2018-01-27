@@ -34,19 +34,6 @@ class Clip(regularizers.Regularizer):
 		return {'max': float(self.max)}
 
 
-def cartesian_product_matrix(a, b):
-	tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0], 1])
-	tile_a = tf.expand_dims(tile_a, 2)
-
-	tile_b = tf.tile(tf.expand_dims(b, 0), [tf.shape(a)[0], 1, 1])
-	tile_b = tf.expand_dims(tile_b, 2)
-
-	cartesian_product = tf.concat([tile_a, tile_b], axis=2)
-
-	return cartesian_product
-
-
-
 
 class Adjacency(Layer):
 
@@ -59,11 +46,9 @@ class Adjacency(Layer):
 		self.product_count = product_count
 		self.style_width = style_width
 
-		# if self.use_legacy_1:
-		self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
-	
-		# if self.use_legacy_2
-		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
+		if self.use_legacy_1 or self.use_legacy_2:
+			self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
+			self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
 		
 		super(Adjacency, self).__init__(**kwargs)
 
@@ -76,17 +61,28 @@ class Adjacency(Layer):
 		]
 		self.set_weights(wts)
 
-	def __call__(self, inputs, **kwargs):
-		
-		product_ct = inputs.shape[1]
-		person_ct = inputs.shape[2]
-		my_batch = product_ct * person_ct
+	def cartesian_product_matrix(self, a, b):
+		tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0], 1])
+		tile_a = tf.expand_dims(tile_a, 2)
 
-		self.inner_input = Input(batch_shape=(product_ct, person_ct, 2, self.style_width), dtype='float32', name="inner_d0")
-		self.reshaped_to_look_like_a_batch = K.reshape(self.inner_input, (product_ct * person_ct, 2 * self.style_width))
-		self.dense1_called = self.dense1(self.reshaped_to_look_like_a_batch)
-		self.dense3_called = self.dense3(self.dense1_called)
-		self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
+		tile_b = tf.tile(tf.expand_dims(b, 0), [tf.shape(a)[0], 1, 1])
+		tile_b = tf.expand_dims(tile_b, 2)
+
+		cartesian_product = tf.concat([tile_a, tile_b], axis=2)
+		return cartesian_product
+
+
+	def __call__(self, inputs, **kwargs):
+		if self.use_legacy_2 or self.use_legacy_1:
+			product_ct = inputs.shape[1]
+			person_ct = inputs.shape[2]
+			my_batch = product_ct * person_ct
+
+			self.inner_input = Input(batch_shape=(product_ct, person_ct, 2, self.style_width), dtype='float32', name="inner_d0")
+			self.reshaped_to_look_like_a_batch = K.reshape(self.inner_input, (product_ct * person_ct, 2 * self.style_width))
+			self.dense1_called = self.dense1(self.reshaped_to_look_like_a_batch)
+			self.dense3_called = self.dense3(self.dense1_called)
+			self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
 		
 		return super(Adjacency, self).__call__(inputs, **kwargs)
 
@@ -126,16 +122,16 @@ class Adjacency(Layer):
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
-	def call(self, x):
-		pr = self.product
-		pe = self.person
+	def call_simple(self, x): 
+		proj = K.dot(self.product, K.transpose(self.person))
+		mul = proj * x
+		return mul
 
+	def call(self, x):
 		self.jitter_weights(idx_to_jitter=[0, 1])
 
-		all_pairs = cartesian_product_matrix(pr, pe)
-
+		all_pairs = self.cartesian_product_matrix(self.product, self.person)
 		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
-
 
 		if self.use_legacy_1:
 			m = self.dense1.call(flat)
@@ -150,14 +146,8 @@ class Adjacency(Layer):
 			m = K.relu(m, alpha=0.1)
 
 
-		square = K.reshape(m, (1, self.product_count, self.person_count))
-		batched = K.tile(square, [self.batch_size,1,1])
-		#proj = K.dot(pr, K.transpose(pe))# + self.noise
-
-		mul = batched * x
-		# mul = mul * self.w1 + self.b1
-		# mul = K.sigmoid(mul)
-		# mul = mul * self.w2 + self.b2
+		m = K.reshape(m, (1, self.product_count, self.person_count))
+		mul = m * x
 
 		return mul
 
