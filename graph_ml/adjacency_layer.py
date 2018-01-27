@@ -46,19 +46,38 @@ def cartesian_product_matrix(a, b):
 	return cartesian_product
 
 
+
+
 class Adjacency(Layer):
 
 	def __init__(self, person_count, product_count, style_width, **kwargs):
+
+		self.use_legacy_1 = False
+		self.use_legacy_2 = False
+
 		self.person_count = person_count
 		self.product_count = product_count
 		self.style_width = style_width
-		self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
-		#self.dense2 = layers.(units=(1), activation=activations.linear)
-		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
+
+		# if self.use_legacy_1:
+		self.dense1 = layers.Dense(units=(style_width), kernel_initializer='ones', activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
+	
+		# if self.use_legacy_2
+		self.dense3 = layers.Dense(units=1, kernel_initializer='ones', activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
+		
 		super(Adjacency, self).__init__(**kwargs)
 
+	def jitter_weights(self, idx_to_jitter, radius=0.2):
+		wts = self.get_weights()
+
+		wts = [
+			np.array(val + np.random.normal(0, radius, val.shape), dtype=np.float32) if idx in idx_to_jitter else val
+			for idx, val in enumerate(wts)
+		]
+		self.set_weights(wts)
+
 	def __call__(self, inputs, **kwargs):
-		self.batch_size = inputs.shape[0]
+		
 		product_ct = inputs.shape[1]
 		person_ct = inputs.shape[2]
 		my_batch = product_ct * person_ct
@@ -66,48 +85,44 @@ class Adjacency(Layer):
 		self.inner_input = Input(batch_shape=(product_ct, person_ct, 2, self.style_width), dtype='float32', name="inner_d0")
 		self.reshaped_to_look_like_a_batch = K.reshape(self.inner_input, (product_ct * person_ct, 2 * self.style_width))
 		self.dense1_called = self.dense1(self.reshaped_to_look_like_a_batch)
-		#self.dense2_called = self.dense2(self.dense1_called)
 		self.dense3_called = self.dense3(self.dense1_called)
 		self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
+		
 		return super(Adjacency, self).__call__(inputs, **kwargs)
 
 
 	def build(self, input_shape):
+		self.batch_size = input_shape[0]
+
 		# Create a trainable weight variable for this layer.
 		self.person = self.add_weight(name='people', 
 			shape=(self.person_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=0),
-			# initializer='ones',
-			# regularizer=PD(),
+			initializer='zero',
 			trainable=True)
 
 		self.product = self.add_weight(name='product', 
 			shape=(self.product_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=0),
-			# initializer='ones',
-			# regularizer=PD(),
+			initializer='zero',
 			trainable=True)
 
+		if not self.use_legacy_1:
+			# self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
+			self.w1 = self.add_weight(name='w1', 
+				shape=(2 * self.style_width, 
+						self.style_width),
+				initializer='ones',
+				regularizer=Clip(),
+				trainable=True)
 
-		# self.w1 = self.add_weight(name='w1', 
-		# 	shape=(1,),
-		# 	initializer='one',
-		# 	trainable=True)
 
-		# self.b1 = self.add_weight(name='b1', 
-		# 	shape=(1,),
-		# 	initializer='zero',
-		# 	trainable=True)
+		if not self.use_legacy_2:
+			# self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
+			self.w2 = self.add_weight(name='w2', 
+				shape=(self.style_width, 1),
+				initializer='ones', # glorot_uniform
+				trainable=True,
+				regularizer=Clip())
 
-		# self.w2 = self.add_weight(name='w2', 
-		# 	shape=(1,),
-		# 	initializer='one',
-		# 	trainable=True)
-
-		# self.b2 = self.add_weight(name='b2', 
-		# 	shape=(1,),
-		# 	initializer='zero',
-		# 	trainable=True)
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
@@ -115,33 +130,31 @@ class Adjacency(Layer):
 		pr = self.product
 		pe = self.person
 
-		#pr = K.concatenate([
-		#	self.product,
-		#	1.0 - self.product
-		#], axis=1)
-		
-		#pe = K.concatenate([
-		#	self.person,
-		#	1.0 - self.person
-		#], axis=1)
-
-		wts = self.get_weights()
-		temp_pe = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
-		temp_pr = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
-		self.set_weights([np.array(temp_pe, dtype=np.float32), np.array(temp_pr, dtype=np.float32)])
+		self.jitter_weights(idx_to_jitter=[0, 1])
 
 		all_pairs = cartesian_product_matrix(pr, pe)
 
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
 
-		#inner = self.inner_input.call(all_pairs)
-		hidden = self.dense1.call(K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width)))
-		#proj = self.dense2.call(hidden)
-		proj = self.dense3.call(hidden)
-		proj = K.reshape(proj, (1, self.product_count, self.person_count))
-		proj = K.tile(proj, [self.batch_size,1,1])
+
+		if self.use_legacy_1:
+			m = self.dense1.call(flat)
+		else:
+			m = K.dot(flat, self.w1)
+			m = K.softplus(m)
+
+		if self.use_legacy_2:
+			m = self.dense3.call(m)
+		else:
+			m = K.dot(m, self.w2)
+			m = K.relu(m, alpha=0.1)
+
+
+		square = K.reshape(m, (1, self.product_count, self.person_count))
+		batched = K.tile(square, [self.batch_size,1,1])
 		#proj = K.dot(pr, K.transpose(pe))# + self.noise
 
-		mul = proj * x
+		mul = batched * x
 		# mul = mul * self.w1 + self.b1
 		# mul = K.sigmoid(mul)
 		# mul = mul * self.w2 + self.b2
@@ -150,3 +163,5 @@ class Adjacency(Layer):
 
 	def compute_output_shape(self, input_shape):
 		return input_shape
+
+
