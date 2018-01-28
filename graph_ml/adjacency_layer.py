@@ -88,91 +88,113 @@ class Adjacency(Layer):
 			# regularizer=PD(),
 			trainable=True)
 
-		self.b2 = self.add_weight(name='b2', 
-			shape=(1,),
+
+		self.w1 = self.add_weight(name='w1', 
+			shape=(2 * self.style_width, 
+					self.style_width),
+			initializer='glorot_uniform',
+			trainable=True)
+
+		self.b1 = self.add_weight(name='b1', 
+			shape=(self.style_width, ),
 			initializer='zero',
 			trainable=True)
 
-		self.m2 = self.add_weight(name='m2', 
+
+
+
+		# self.w2 = self.add_weight(name='w2', 
+		# 	shape=(self.style_width, 1),
+		# 	initializer='glorot_uniform',
+		# 	trainable=True)
+
+		# self.b2 = self.add_weight(name='b2', 
+		# 	shape=(1, ),
+		# 	initializer='zero',
+		# 	trainable=True)
+
+
+		# self.b3 = self.add_weight(name='b2', 
+		# 	shape=(1,),
+		# 	initializer='zero',
+		# 	trainable=True)
+
+		self.w3 = self.add_weight(name='m2', 
 			shape=(1,),
 			initializer='one',
 			trainable=True)
 
-		# self.w1 = self.add_weight(name='w1', 
-		# 	shape=(2 * self.style_width, 
-		# 			self.style_width),
-		# 	initializer='glorot_uniform',
-		# 	regularizer=Clip(),
-		# 	trainable=True)
-
-		# self.w2 = self.add_weight(name='w2', 
-		# 	shape=(self.style_width, 1),
-		# 	initializer='glorot_uniform', # glorot_uniform
-		# 	trainable=True,
-		# 	regularizer=Clip())
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
-	def jitter(self, var=0.2):
+	def jitter(self, idx=[0,1], var=0.2):
 		wts = self.get_weights()
 		
-		for i in [0,1]:
+		for i in idx:
 			wts[i] += np.random.normal(0, var, wts[i].shape)
 		
 		self.set_weights(wts)
 
 	def call(self, x):
-		return self.call_dot(x)
+		return self.call_dense(x)
 
-	def call_dot(self, x):
+	def call_dot_softmax(self, x):
 		pr = self.product
 		pe = self.person
-
-		# pr = K.relu(pr)
-		# pe = K.relu(pe)
 
 		pr = K.softmax(self.product)
 		pe = K.softmax(self.person)
 
 		m = K.dot(pr, K.transpose(pe))
-		m = (self.m2 * m) + self.b2
+		m = (self.w3 * m) + self.b3
 		m = K.tanh(m)
 
 		m = m * x
 
 		return m
 
+	def call_dot(self, x):
+		pr = self.product
+		pe = self.person
+
+		m = K.dot(pr, K.transpose(pe))
+		m = m * x
+
+		return m
+
 	def call_dense(self, x):
-		self.jitter()
+		self.jitter(idx=[0,1,2,3,4])
 
 		pr = self.product
 		pe = self.person
 
-		# pr = K.softmax(pr)
-		# pe = K.softmax(pe)
+		pr = K.softmax(pr)
+		pe = K.softmax(pe)
 
 		all_pairs = cartesian_product_matrix(pr, pe)
 
 		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
 
-		hidden = self.dense1.call(flat)
+		# m = self.dense1.call(flat)
 		# WHY does using this instead of dense1 fail ?!
-		# hidden = K.dot(flat, self.w1)
-		# hidden = K.softplus(hidden)
+		m = K.dot(flat, self.w1)
+		m = K.bias_add(m, self.b1)
+		m = K.sigmoid(m)
 
-
-		proj = self.dense3.call(hidden)
+		# m = self.dense3.call(m)
 		# WHY does using this instead of dense3 fail ?!
-		# proj = K.dot(hidden, self.w2)
-		# proj = K.relu(proj, alpha=0.1)
+		# m = K.dot(m, self.w2)
+		# m = K.bias_add(m, self.b2)
+		m = K.sum(m, axis=-1)
+		m = m * self.w3
+		m = K.sigmoid(m)
 
-		proj = K.reshape(proj, (1, self.product_count, self.person_count))
-		proj = K.tile(proj, [self.batch_size,1,1])
-		#proj = K.dot(pr, K.transpose(pe))# + self.noise
+		# m = (self.w3 * m) + self.b3
+		# m = K.sigmoid(m)
 
-		mul = proj * x
-
-		return mul
+		m = K.reshape(m, (1, self.product_count, self.person_count))
+		masked = m * x
+		return masked
 
 	def compute_output_shape(self, input_shape):
 		return input_shape
