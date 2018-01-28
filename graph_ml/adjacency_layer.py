@@ -76,14 +76,14 @@ class Adjacency(Layer):
 		# Create a trainable weight variable for this layer.
 		self.person = self.add_weight(name='people', 
 			shape=(self.person_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=0),
+			initializer='uniform',
 			# initializer='ones',
 			# regularizer=PD(),
 			trainable=True)
 
 		self.product = self.add_weight(name='product', 
 			shape=(self.product_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=0),
+			initializer='uniform',
 			# initializer='ones',
 			# regularizer=PD(),
 			trainable=True)
@@ -103,35 +103,30 @@ class Adjacency(Layer):
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
+	def jitter(self):
+		wts = self.get_weights()
+		
+		for i in [0,1]:
+			wts[i] += np.random.normal(0, 0.2, wts[i].shape)
+		
+		self.set_weights(wts)
+
 	def call(self, x):
+		return self.call_dot(x)
+
+	def call_dot(self, x):
+		proj = K.dot(self.product, K.transpose(self.person))
+		mul = proj * x
+		return mul
+
+	def call_dense(self, x):
+		self.jitter()
+
 		pr = self.product
 		pe = self.person
 
-
-		#pr = K.concatenate([
-		#	self.product,
-		#	1.0 - self.product
-		#], axis=1)
-		
-		#pe = K.concatenate([
-		#	self.person,
-		#	1.0 - self.person
-		#], axis=1)
-
-		# proj = K.dot(self.product, K.transpose(self.person))
-
-		#pr += (1 - pr) * K.random_normal(shape=K.shape(pr),
-		#					 mean=0,
-		#					 stddev=0.2)
-
-		#pe += (1 - pe) * K.random_normal(shape=K.shape(pe),
-		#					 mean=0,
-		#					 stddev=0.2)
-
-		wts = self.get_weights()
-		wts[0] = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
-		wts[1] = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
-		self.set_weights(wts)
+		# pr = K.softmax(pr)
+		# pe = K.softmax(pe)
 
 		all_pairs = cartesian_product_matrix(pr, pe)
 
