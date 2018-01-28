@@ -42,20 +42,21 @@ class StopEarlyIfAbove(keras.callbacks.Callback):
 
 
 class SpecialValidator(keras.callbacks.Callback):
-	def __init__(self, experiment, dataset, model):
+	def __init__(self, experiment, dataset, model, verbose):
 		self.experiment = experiment
 		self.model = model
 		self.dataset = dataset
+		self.verbose = verbose
 		super(keras.callbacks.Callback, self).__init__()
 
 	
 	def on_train_end(self, logs):
-		self.test()
+		self.test(self.verbose)
 
 	def on_epoch_end(self, epoch, logs):
 		self.test()
 
-	def test(self):
+	def test(self, verbose=False):
 		print() # Clear from epoch status bar
 		for (label, genie) in self.dataset.generator.items():
 			# print(f"Prediction for {label}")
@@ -84,10 +85,9 @@ class SpecialValidator(keras.callbacks.Callback):
 			# The correct predictions for the input adj
 			y_masked_david = np.where(np.greater(x_test, 0.1), y_correct, False)
 
-			# print("x_test: ",x_test)
-			# print("y_true: ", y_true)
-			# print("y_pred: ", np.around(y_pred, 1))
-			# print("y_correct: ",y_correct)
+			if verbose:
+				print("y_pred: ", np.around(y_pred, 1))
+				print("y_correct: ", y_correct)
 			# print(f"y_masked {np.count_nonzero(y_masked)} / {np.count_nonzero(y_correct)} / {np.count_nonzero(x_test)}")
 			
 			net_accuracy = round(np.count_nonzero(y_masked) / (np.count_nonzero(y_true_set_and_in_mask)+0.001) * 100, 3)
@@ -121,7 +121,7 @@ class Train(object):
 
 		callbacks = [
 			#StopEarlyIfAbove(verbose=params.verbose),
-			SpecialValidator(experiment, dataset, model),
+			SpecialValidator(experiment, dataset, model, params.print_weights),
 			# keras.callbacks.ModelCheckpoint(params_file, verbose=params.verbose, save_best_only=True, monitor='val_loss', mode='auto', period=3),
 			# keras.callbacks.TensorBoard(log_dir=generate_output_path(experiment, f"_log/{experiment.run_tag}/")),
 			#keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.000000001, patience=8, verbose=0, mode='auto')
@@ -165,7 +165,7 @@ class Train(object):
 		if params.print_weights:
 			for layer in model.layers:
 				for var, weight in zip(layer.weights, layer.get_weights()):
-					print(f"{var.name} {np.around(weight, decimals=2)}")
+					print(f"{var.name} {np.around(weight, decimals=1)}")
 
 
 		return score

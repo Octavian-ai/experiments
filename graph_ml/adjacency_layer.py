@@ -88,6 +88,16 @@ class Adjacency(Layer):
 			# regularizer=PD(),
 			trainable=True)
 
+		self.b2 = self.add_weight(name='b2', 
+			shape=(1,),
+			initializer='zero',
+			trainable=True)
+
+		self.m2 = self.add_weight(name='m2', 
+			shape=(1,),
+			initializer='one',
+			trainable=True)
+
 		# self.w1 = self.add_weight(name='w1', 
 		# 	shape=(2 * self.style_width, 
 		# 			self.style_width),
@@ -103,11 +113,11 @@ class Adjacency(Layer):
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
-	def jitter(self):
+	def jitter(self, var=0.2):
 		wts = self.get_weights()
 		
 		for i in [0,1]:
-			wts[i] += np.random.normal(0, 0.2, wts[i].shape)
+			wts[i] += np.random.normal(0, var, wts[i].shape)
 		
 		self.set_weights(wts)
 
@@ -115,9 +125,22 @@ class Adjacency(Layer):
 		return self.call_dot(x)
 
 	def call_dot(self, x):
-		proj = K.dot(self.product, K.transpose(self.person))
-		mul = proj * x
-		return mul
+		pr = self.product
+		pe = self.person
+
+		# pr = K.relu(pr)
+		# pe = K.relu(pe)
+
+		pr = K.softmax(self.product)
+		pe = K.softmax(self.person)
+
+		m = K.dot(pr, K.transpose(pe))
+		m = (self.m2 * m) + self.b2
+		m = K.tanh(m)
+
+		m = m * x
+
+		return m
 
 	def call_dense(self, x):
 		self.jitter()
@@ -153,3 +176,5 @@ class Adjacency(Layer):
 
 	def compute_output_shape(self, input_shape):
 		return input_shape
+
+

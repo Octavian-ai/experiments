@@ -271,7 +271,7 @@ directory = {
 			"person_count": 1200, # total 1200
 			"style_width": 6,
 			"epochs": 10000,
-			"batch_per_epoch": 1
+			"batch_per_epoch": 10
 		}
 	),
 

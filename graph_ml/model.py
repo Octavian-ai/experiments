@@ -167,7 +167,7 @@ class Model(object):
 			model = keras.models.Model(inputs=[adj_con], outputs=[features])
 
 			model.compile(loss=keras.losses.mean_squared_error,
-				optimizer=keras.optimizers.Adam(lr=1.5, decay=0.01),
+				optimizer=keras.optimizers.Adam(lr=0.2, decay=0.01),
 				metrics=['accuracy'])
 
 			return model
