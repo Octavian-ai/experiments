@@ -34,18 +34,6 @@ class Clip(regularizers.Regularizer):
 		return {'max': float(self.max)}
 
 
-def cartesian_product_matrix(a, b):
-	tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0], 1])
-	tile_a = tf.expand_dims(tile_a, 2)
-
-	tile_b = tf.tile(tf.expand_dims(b, 0), [tf.shape(a)[0], 1, 1])
-	tile_b = tf.expand_dims(tile_b, 2)
-
-	cartesian_product = tf.concat([tile_a, tile_b], axis=2)
-
-	return cartesian_product
-
-
 class Adjacency(Layer):
 
 	def __init__(self, person_count, product_count, style_width, **kwargs):
@@ -71,6 +59,18 @@ class Adjacency(Layer):
 		self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
 		return super(Adjacency, self).__call__(inputs, **kwargs)
 
+	def cartesian_product_matrix(self, a, b):
+		tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0], 1])
+		tile_a = tf.expand_dims(tile_a, 2)
+
+		tile_b = tf.tile(tf.expand_dims(b, 0), [tf.shape(a)[0], 1, 1])
+		tile_b = tf.expand_dims(tile_b, 2)
+
+		cartesian_product = tf.concat([tile_a, tile_b], axis=-1)
+
+		return cartesian_product
+
+
 
 	def build(self, input_shape):
 		# Create a trainable weight variable for this layer.
@@ -89,19 +89,26 @@ class Adjacency(Layer):
 			trainable=True)
 
 
-		self.w1 = self.add_weight(name='w1', 
-			shape=(2 * self.style_width, 
-					self.style_width),
-			initializer='glorot_uniform',
-			trainable=True)
+		# self.w1 = self.add_weight(name='w1', 
+		# 	shape=(2, 1),
+		# 	initializer='glorot_uniform',
+		# 	trainable=True)
 
-		self.b1 = self.add_weight(name='b1', 
-			shape=(self.style_width, ),
-			initializer='zero',
-			trainable=True)
+		# self.b1 = self.add_weight(name='b1', 
+		# 	shape=(1, ),
+		# 	initializer='zero',
+		# 	trainable=True)
 
+		# self.w1 = self.add_weight(name='w1', 
+		# 	shape=(2 * self.style_width, 
+		# 		   self.style_width),
+		# 	initializer='glorot_uniform',
+		# 	trainable=True)
 
-
+		# self.b1 = self.add_weight(name='b1', 
+		# 	shape=(self.style_width, ),
+		# 	initializer='zero',
+		# 	trainable=True)
 
 		# self.w2 = self.add_weight(name='w2', 
 		# 	shape=(self.style_width, 1),
@@ -114,10 +121,10 @@ class Adjacency(Layer):
 		# 	trainable=True)
 
 
-		# self.b3 = self.add_weight(name='b2', 
-		# 	shape=(1,),
-		# 	initializer='zero',
-		# 	trainable=True)
+		self.b3 = self.add_weight(name='b2', 
+			shape=(1,),
+			initializer='zero',
+			trainable=True)
 
 		self.w3 = self.add_weight(name='m2', 
 			shape=(1,),
@@ -136,7 +143,7 @@ class Adjacency(Layer):
 		self.set_weights(wts)
 
 	def call(self, x):
-		return self.call_dense(x)
+		return self.call_dot_softmax(x)
 
 	def call_dot_softmax(self, x):
 		pr = self.product
@@ -147,7 +154,7 @@ class Adjacency(Layer):
 
 		m = K.dot(pr, K.transpose(pe))
 		m = (self.w3 * m) + self.b3
-		m = K.tanh(m)
+		m = K.relu(m, alpha=0.1)
 
 		m = m * x
 
@@ -163,7 +170,7 @@ class Adjacency(Layer):
 		return m
 
 	def call_dense(self, x):
-		self.jitter(idx=[0,1,2,3,4])
+		self.jitter(idx=[0,1])
 
 		pr = self.product
 		pe = self.person
@@ -171,9 +178,9 @@ class Adjacency(Layer):
 		pr = K.softmax(pr)
 		pe = K.softmax(pe)
 
-		all_pairs = cartesian_product_matrix(pr, pe)
+		all_pairs = self.cartesian_product_matrix(pr, pe)
 
-		flat = K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width))
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count * self.style_width, 2))
 
 		# m = self.dense1.call(flat)
 		# WHY does using this instead of dense1 fail ?!
@@ -181,20 +188,52 @@ class Adjacency(Layer):
 		m = K.bias_add(m, self.b1)
 		m = K.sigmoid(m)
 
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count, self.style_width))
+
 		# m = self.dense3.call(m)
 		# WHY does using this instead of dense3 fail ?!
-		# m = K.dot(m, self.w2)
+		# m = K.squeeze(m)
+		m = K.dot(m, self.w2)
 		# m = K.bias_add(m, self.b2)
-		m = K.sum(m, axis=-1)
-		m = m * self.w3
-		m = K.sigmoid(m)
-
-		# m = (self.w3 * m) + self.b3
+		# m = K.sum(m, axis=-1)
+		# m = m * self.w3
 		# m = K.sigmoid(m)
+
+		m = (self.w3 * m) + self.b3
+		m = K.tanh(m)
 
 		m = K.reshape(m, (1, self.product_count, self.person_count))
 		masked = m * x
 		return masked
+
+
+
+	def call_dense_conv(self, x):
+		self.jitter(idx=[0,1])
+
+		pr = self.product
+		pe = self.person
+
+		pr = K.softmax(pr)
+		pe = K.softmax(pe)
+
+		all_pairs = self.cartesian_product_matrix(pr, pe)
+
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count * self.style_width, 2))
+		m = K.dot(flat, self.w1)
+		m = K.tanh(m)
+
+		m = K.reshape(m, (self.product_count * self.person_count, self.style_width))
+		m = K.dot(m, self.w2)
+
+		m = (self.w3 * m) + self.b3
+		m = K.relu(m, alpha=0.1)
+
+		m = K.reshape(m, (1, self.product_count, self.person_count))
+		masked = m * x
+		return masked
+
+
 
 	def compute_output_shape(self, input_shape):
 		return input_shape
