@@ -52,9 +52,9 @@ class Adjacency(Layer):
 		self.person_count = person_count
 		self.product_count = product_count
 		self.style_width = style_width
-		self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
-		#self.dense2 = layers.(units=(1), activation=activations.linear)
-		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
+		self.dense1 = layers.Dense(units=(style_width), activation=activations.tanh, use_bias=False)
+		self.dense2 = layers.Dense(units=(style_width), activation=activations.tanh, use_bias=False)
+		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False)
 		super(Adjacency, self).__init__(**kwargs)
 
 	def __call__(self, inputs, **kwargs):
@@ -66,8 +66,8 @@ class Adjacency(Layer):
 		self.inner_input = Input(batch_shape=(product_ct, person_ct, 2, self.style_width), dtype='float32', name="inner_d0")
 		self.reshaped_to_look_like_a_batch = K.reshape(self.inner_input, (product_ct * person_ct, 2 * self.style_width))
 		self.dense1_called = self.dense1(self.reshaped_to_look_like_a_batch)
-		#self.dense2_called = self.dense2(self.dense1_called)
-		self.dense3_called = self.dense3(self.dense1_called)
+		self.dense2_called = self.dense2(self.dense1_called)
+		self.dense3_called = self.dense3(self.dense2_called)
 		self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
 		return super(Adjacency, self).__call__(inputs, **kwargs)
 
@@ -78,14 +78,14 @@ class Adjacency(Layer):
 			shape=(self.person_count, self.style_width),
 			initializer=initializers.RandomUniform(minval=0, maxval=0),
 			# initializer='ones',
-			# regularizer=PD(),
+			regularizer=Clip(),
 			trainable=True)
 
 		self.product = self.add_weight(name='product', 
 			shape=(self.product_count, self.style_width),
 			initializer=initializers.RandomUniform(minval=0, maxval=0),
 			# initializer='ones',
-			# regularizer=PD(),
+			regularizer=Clip(),
 			trainable=True)
 
 
@@ -137,8 +137,8 @@ class Adjacency(Layer):
 		#					 stddev=0.2)
 
 		wts = self.get_weights()
-		temp_pe = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
-		temp_pr = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
+		temp_pe = wts[0] + np.random.normal(0, 0.001, wts[0].shape)
+		temp_pr = wts[1] + np.random.normal(0, 0.001, wts[1].shape)
 		self.set_weights([np.array(temp_pe, dtype=np.float32), np.array(temp_pr, dtype=np.float32)])
 
 		all_pairs = cartesian_product_matrix(pr, pe)
@@ -146,11 +146,12 @@ class Adjacency(Layer):
 
 		#inner = self.inner_input.call(all_pairs)
 		hidden = self.dense1.call(K.reshape(all_pairs, (self.product_count * self.person_count, 2 * self.style_width)))
-		#proj = self.dense2.call(hidden)
-		proj = self.dense3.call(hidden)
+		proj = self.dense2.call(hidden)
+		proj = self.dense3.call(proj)
 		proj = K.reshape(proj, (1, self.product_count, self.person_count))
 		proj = K.tile(proj, [self.batch_size,1,1])
-		#proj = K.dot(pr, K.transpose(pe))# + self.noise
+
+		# proj = K.dot(self.product, K.transpose(self.person))
 
 		mul = proj * x
 		# mul = mul * self.w1 + self.b1

@@ -89,7 +89,7 @@ class SpecialValidator(keras.callbacks.Callback):
 			gross_accuracy = round(np.count_nonzero(y_correct) / np.size(y_correct) * 100, 3)
 
 			print(f"{label} accuracy {net_accuracy}% ({net_accuracy_david}%)")
-			# print()
+		print()
 
 
 

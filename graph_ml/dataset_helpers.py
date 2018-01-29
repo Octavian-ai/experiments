@@ -324,9 +324,13 @@ class DatasetHelpers(object):
 			for i in range(bs * experiment.header.params["batch_per_epoch"]):
 				for partition, pt in datas.items():
 					if partition=="train":
+						mask_seed = np.random.randint(100, size=shape)
+						training_rand = np.greater(mask_seed, 50)
+						pt = Point(np.where(training_rand, pt.x, 0), np.where(training_rand, pt.y, 0))
+					if partition=="train" and False:
 						pe_flag = False
 						pr_flag = False
-						if pause[0] > 48:
+						if pause[0] > 256:
 
 							def do_product():
 								if not pr_flag:
@@ -436,7 +440,7 @@ class DatasetHelpers(object):
 			assert_mtx_shape(adj_score, shape, "adj_score")
 			assert_mtx_shape(adj_con,   shape)
 
-			mask_seed = np.random.randint(10, size=shape)
+			mask_seed = np.random.randint(75, size=shape)
 			masks = {
 				"test":     np.equal(mask_seed, 0),
 				"train":    np.greater(mask_seed, 1),

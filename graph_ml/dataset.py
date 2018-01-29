@@ -137,11 +137,13 @@ class Dataset(object):
 		self.train_generator 		= peekable(chunk(just("train"), bs))
 		self.validation_generator 	= peekable(chunk(just("validate"), bs))
 		self.test_generator 		= peekable(chunk(just("test"), bs))
+		self.all_generator 		= peekable(chunk(just("all"), bs))
 
 		self.generator = {
 			"test": self.test_generator,
 			"train": self.train_generator,
-			"validate": self.validation_generator
+			"validate": self.validation_generator,
+			"all": self.all_generator
 		}
 
 		f = self.train_generator.peek()
