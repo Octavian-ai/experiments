@@ -89,7 +89,7 @@ class Adjacency(Layer):
 			trainable=True)
 
 
-		# self.w1 = self.add_weight(name='w1', 
+		# self.wc1 = self.add_weight(name='w1', 
 		# 	shape=(2, 1),
 		# 	initializer='glorot_uniform',
 		# 	trainable=True)
@@ -99,21 +99,21 @@ class Adjacency(Layer):
 		# 	initializer='zero',
 		# 	trainable=True)
 
-		# self.w1 = self.add_weight(name='w1', 
-		# 	shape=(2 * self.style_width, 
-		# 		   self.style_width),
-		# 	initializer='glorot_uniform',
-		# 	trainable=True)
+		self.w1 = self.add_weight(name='w1', 
+			shape=(2 * self.style_width, 
+				   self.style_width),
+			initializer='glorot_uniform',
+			trainable=True)
 
 		# self.b1 = self.add_weight(name='b1', 
 		# 	shape=(self.style_width, ),
 		# 	initializer='zero',
 		# 	trainable=True)
 
-		# self.w2 = self.add_weight(name='w2', 
-		# 	shape=(self.style_width, 1),
-		# 	initializer='glorot_uniform',
-		# 	trainable=True)
+		self.w2 = self.add_weight(name='w2', 
+			shape=(self.style_width, 1),
+			initializer='glorot_uniform',
+			trainable=True)
 
 		# self.b2 = self.add_weight(name='b2', 
 		# 	shape=(1, ),
@@ -121,15 +121,15 @@ class Adjacency(Layer):
 		# 	trainable=True)
 
 
-		self.b3 = self.add_weight(name='b2', 
-			shape=(1,),
-			initializer='zero',
-			trainable=True)
+		# self.b3 = self.add_weight(name='b2', 
+		# 	shape=(1,),
+		# 	initializer='zero',
+		# 	trainable=True)
 
-		self.w3 = self.add_weight(name='m2', 
-			shape=(1,),
-			initializer='one',
-			trainable=True)
+		# self.w3 = self.add_weight(name='m2', 
+		# 	shape=(1,),
+		# 	initializer='one',
+		# 	trainable=True)
 
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
@@ -143,8 +143,9 @@ class Adjacency(Layer):
 		self.set_weights(wts)
 
 	def call(self, x):
-		return self.call_dot_softmax(x)
+		return self.call_dense(x)
 
+	# 100pc test accuracy
 	def call_dot_softmax(self, x):
 		pr = self.product
 		pe = self.person
@@ -160,6 +161,7 @@ class Adjacency(Layer):
 
 		return m
 
+	# 100pc test accuracy
 	def call_dot(self, x):
 		pr = self.product
 		pe = self.person
@@ -169,8 +171,9 @@ class Adjacency(Layer):
 
 		return m
 
+	# Seen at 68% 1-accuracy test
 	def call_dense(self, x):
-		self.jitter(idx=[0,1])
+		# self.jitter(idx=[0,1])
 
 		pr = self.product
 		pe = self.person
@@ -179,28 +182,16 @@ class Adjacency(Layer):
 		pe = K.softmax(pe)
 
 		all_pairs = self.cartesian_product_matrix(pr, pe)
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count, self.style_width * 2))
 
-		flat = K.reshape(all_pairs, (self.product_count * self.person_count * self.style_width, 2))
-
-		# m = self.dense1.call(flat)
-		# WHY does using this instead of dense1 fail ?!
 		m = K.dot(flat, self.w1)
-		m = K.bias_add(m, self.b1)
-		m = K.sigmoid(m)
+		# m = K.bias_add(m, self.b1)
+		m = K.relu(m, alpha=0.1)
 
-		flat = K.reshape(all_pairs, (self.product_count * self.person_count, self.style_width))
+		m = K.dropout(m, level=0.1)
 
-		# m = self.dense3.call(m)
-		# WHY does using this instead of dense3 fail ?!
-		# m = K.squeeze(m)
 		m = K.dot(m, self.w2)
-		# m = K.bias_add(m, self.b2)
-		# m = K.sum(m, axis=-1)
-		# m = m * self.w3
-		# m = K.sigmoid(m)
-
-		m = (self.w3 * m) + self.b3
-		m = K.tanh(m)
+		m = K.relu(m, alpha=0.1)
 
 		m = K.reshape(m, (1, self.product_count, self.person_count))
 		masked = m * x
@@ -208,6 +199,7 @@ class Adjacency(Layer):
 
 
 
+	# 100pc test accuracy
 	def call_dense_conv(self, x):
 		self.jitter(idx=[0,1])
 
@@ -220,13 +212,11 @@ class Adjacency(Layer):
 		all_pairs = self.cartesian_product_matrix(pr, pe)
 
 		flat = K.reshape(all_pairs, (self.product_count * self.person_count * self.style_width, 2))
-		m = K.dot(flat, self.w1)
+		m = K.dot(flat, self.wc1)
 		m = K.tanh(m)
 
 		m = K.reshape(m, (self.product_count * self.person_count, self.style_width))
 		m = K.dot(m, self.w2)
-
-		m = (self.w3 * m) + self.b3
 		m = K.relu(m, alpha=0.1)
 
 		m = K.reshape(m, (1, self.product_count, self.person_count))

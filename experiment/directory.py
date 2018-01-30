@@ -269,7 +269,7 @@ directory = {
 		{
 			"product_count": 160, # total 160
 			"person_count": 1200, # total 1200
-			"style_width": 6,
+			"style_width": 12,
 			"epochs": 10000,
 			"batch_per_epoch": 10
 		}
