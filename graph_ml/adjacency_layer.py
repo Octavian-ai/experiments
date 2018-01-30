@@ -188,8 +188,6 @@ class Adjacency(Layer):
 		# m = K.bias_add(m, self.b1)
 		m = K.relu(m, alpha=0.1)
 
-		m = K.dropout(m, level=0.1)
-
 		m = K.dot(m, self.w2)
 		m = K.relu(m, alpha=0.1)
 
