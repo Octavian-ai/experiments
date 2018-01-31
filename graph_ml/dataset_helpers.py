@@ -452,14 +452,16 @@ class DatasetHelpers(object):
 				for (k, v) in masks.items()
 			}
 
-			# cache.append(datas)
-			# return gen_output(datas)
+			warm_up = False
 
-			for i in range(experiment.params.batch_size * experiment.header.params["batch_per_epoch"]):
-				for partition, pt in datas.items():
-					yield (partition, pt)
+			if warm_up:
+				cache.append(datas)
+				return gen_output(datas)
 
-			# return datas
+			else:
+				for i in range(experiment.params.batch_size * experiment.header.params["batch_per_epoch"]):
+					for partition, pt in datas.items():
+						yield (partition, pt)
 
 
 		return Recipe(transform=transform, partition=lambda x:x)

@@ -173,7 +173,7 @@ class Adjacency(Layer):
 
 	# Seen at 68% 1-accuracy test
 	def call_dense(self, x):
-		# self.jitter(idx=[0,1])
+		self.jitter(idx=[0,1], var=0.1)
 
 		pr = self.product
 		pe = self.person
@@ -187,6 +187,8 @@ class Adjacency(Layer):
 		m = K.dot(flat, self.w1)
 		# m = K.bias_add(m, self.b1)
 		m = K.relu(m, alpha=0.1)
+
+		m = K.dropout(m, level=0.1)
 
 		m = K.dot(m, self.w2)
 		m = K.relu(m, alpha=0.1)
