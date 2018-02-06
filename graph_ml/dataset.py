@@ -27,8 +27,6 @@ from .dataset_helpers import *
 logger = logging.getLogger(__name__)
 
 
-
-
 class Dataset(object):
 
 
@@ -112,12 +110,16 @@ class Dataset(object):
 		# be memory efficient
 		
 		logger.info(f"Rows returned by Neo4j {len(data)}")
-		data = list(recipe.transform(data))
-		total_data = len(data)
+		list_data = list(recipe.transform(data))
+		total_data = len(list_data)
 		logger.info(f"Number of rows of data: {total_data}")
 
-		stream = recipe.partition(data)
-		stream = cycle(stream)
+
+		def repeat_infinitely(gen_fn):
+			while True:
+				for x in gen_fn():
+					yield x
+		stream = repeat_infinitely(lambda: recipe.partition(recipe.transform(data)))
 
 		def just(tag):
 			return ( (i[1].x, i[1].y) for i in stream if i[0] == tag)

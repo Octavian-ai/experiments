@@ -304,23 +304,88 @@ class DatasetHelpers(object):
 
 	@staticmethod
 	def review_from_all_hidden_adj(experiment) -> Recipe:
+		bs = experiment.params.batch_size
+		person_product = {}
+
+		reviews_per_person = Counter()
+		reviews_per_product = Counter()
+
+		pr_c = experiment.header.params["product_count"]
+		pe_c = experiment.header.params["person_count"]
+
+		shape = (pr_c, pe_c)
+		unmasked_products=np.zeros(shape=(pr_c,))
+		unmasked_products[0] = 1
+		unmasked_people=np.zeros(shape=(pe_c,))
+		cache = []
+		training_mask = np.zeros(shape)
+		pause=[0]
+		def gen_output(datas):
+			for i in range(bs * experiment.header.params["batch_per_epoch"]):
+				for partition, pt in datas.items():
+					if partition=="train":
+						pe_flag = False
+						pr_flag = False
+						if pause[0] > 48:
+
+							def do_product():
+								if not pr_flag:
+									for x in range(pe_c):
+										if unmasked_people[x] == 0 and any(pt.x[y][x] == 1 for y in range(pr_c) if unmasked_products[y] == 1):
+											unmasked_people[x] = 1
+											pe_flag = True
+											break
+
+							def do_person():
+								if not pe_flag:
+									for y in range(pr_c):
+										if unmasked_products[y] == 0 and any(pt.x[y][x] == 1 for x in range(pe_c) if unmasked_people[x] == 1):
+											unmasked_products[y] = 1
+											pr_flag = True
+											break
+
+							if random.random() > 0.5:
+								do_product()
+							else:
+								do_person()
+
+							if not pr_flag and not pe_flag:
+								for x in range(pe_c):
+									if unmasked_people[x] == 0:
+										unmasked_people[x] = 1
+										pe_flag = True
+										break
+								if not pe_flag:
+									for y in range(pr_c):
+										if unmasked_products[y] == 0:
+											unmasked_products[y] = 1
+											pr_flag = True
+											break
+							for x in range(pe_c):
+								#TODO this is like a np.cross or something
+								for y in range(pr_c):
+									if unmasked_people[x] * unmasked_products[y] == 1:
+										training_mask[y][x] = 1
+							if not pe_flag and not pr_flag:
+								assert np.sum(training_mask) == pr_c * pe_c
+								print('all data')
+							pause[0] = 0
+						pause[0]+=1
+
+						pt = Point(np.where(training_mask, pt.x, 0), np.where(training_mask, pt.y, 0))
+						#print(np.sum(pt.x))
+						#print(np.sum(pt.y))
+					yield (partition, pt)
+				# yield Point(adj_con, adj_score)
 
 		def transform(stream):
-			data = list(stream)
+			if len(cache) == 1:
+				return  gen_output(cache[0])
 
-			person_product = {}
+			data = list(stream)
 
 			products = set()
 			people = set()
-
-			reviews_per_person = Counter()
-			reviews_per_product = Counter()
-
-			pr_c = experiment.header.params["product_count"]
-			pe_c = experiment.header.params["person_count"]
-			bs = experiment.params.batch_size
-			shape = (pr_c, pe_c)
-
 			# Construct adjacency dict
 			for i in data:
 				if i["person_id"] not in person_product:
@@ -346,11 +411,11 @@ class DatasetHelpers(object):
 			ppe = list(dict(reviews_per_person).values())
 			ppr = list(dict(reviews_per_product).values())
 
-			print("Reviews per product: ", np.histogram(ppe) )
-			print("Reviews per person: ", np.histogram(ppr) )
+			#print("Reviews per product: ", np.histogram(ppe) )
+			#print("Reviews per person: ", np.histogram(ppr) )
 
-			logger.info(f"People returned {len(people)} of capacity {pe_c}")
-			logger.info(f"Products returned {len(products)} of capacity {pr_c}")
+			#logger.info(f"People returned {len(people)} of capacity {pe_c}")
+			#logger.info(f"Products returned {len(products)} of capacity {pr_c}")
 
 			people   = sorted(list(people))[:pe_c]
 			products = sorted(list(products))[:pr_c]
@@ -387,15 +452,17 @@ class DatasetHelpers(object):
 				for (k, v) in masks.items()
 			}
 
-			# for k, v in datas.items():
-				# print(k, np.sum(v.x), np.sum(v.y), 1.0 - np.sum(v.y)/np.prod(shape), np.sum(np.multiply(v.x, v.y)))
+			warm_up = False
 
-			# print(datas)
 
-			for i in range(bs * experiment.header.params["batch_per_epoch"]):
-				for j in datas.items():
-					yield j
-				# yield Point(adj_con, adj_score)
+			if warm_up:
+				cache.append(datas)
+				return gen_output(datas)
+
+			else:
+				for i in range(experiment.params.batch_size * experiment.header.params["batch_per_epoch"]):
+					for partition, pt in datas.items():
+						yield (partition, pt)
 
 
 		return Recipe(transform=transform, partition=lambda x:x)

@@ -1,6 +1,8 @@
 from keras import backend as K
-from keras.engine.topology import Layer
-from keras import regularizers, initializers
+import tensorflow as tf
+from keras.engine.topology import Layer, Input
+from keras import regularizers, initializers, layers, activations
+from functools import partial
 import numpy as np
 
 class PD(regularizers.Regularizer):
@@ -20,81 +22,210 @@ class PD(regularizers.Regularizer):
 	def get_config(self):
 		return {'a': float(self.a), 'b': float(self.b)}
 
+
+class Clip(regularizers.Regularizer):
+	def __init__(self, max=1):
+		self.max = max
+
+	def __call__(self, x):
+		K.clip(x, min_value=-1, max_value=1)
+
+	def get_config(self):
+		return {'max': float(self.max)}
+
+
 class Adjacency(Layer):
 
 	def __init__(self, person_count, product_count, style_width, **kwargs):
 		self.person_count = person_count
 		self.product_count = product_count
 		self.style_width = style_width
-
+		self.dense1 = layers.Dense(units=(style_width), activation=activations.softplus, use_bias=False, kernel_regularizer=Clip)
+		#self.dense2 = layers.(units=(1), activation=activations.linear)
+		self.dense3 = layers.Dense(units=1, activation=partial(activations.relu, alpha=0.1), use_bias=False, kernel_regularizer=Clip)
 		super(Adjacency, self).__init__(**kwargs)
+
+	def __call__(self, inputs, **kwargs):
+		self.batch_size = inputs.shape[0]
+		product_ct = inputs.shape[1]
+		person_ct = inputs.shape[2]
+		my_batch = product_ct * person_ct
+
+		self.inner_input = Input(batch_shape=(product_ct, person_ct, 2, self.style_width), dtype='float32', name="inner_d0")
+		self.reshaped_to_look_like_a_batch = K.reshape(self.inner_input, (product_ct * person_ct, 2 * self.style_width))
+		self.dense1_called = self.dense1(self.reshaped_to_look_like_a_batch)
+		#self.dense2_called = self.dense2(self.dense1_called)
+		self.dense3_called = self.dense3(self.dense1_called)
+		self.reshaped_to_look_like_adj_mat = K.reshape(self.dense3_called, (product_ct, person_ct, 1))
+		return super(Adjacency, self).__call__(inputs, **kwargs)
+
+	def cartesian_product_matrix(self, a, b):
+		tile_a = tf.tile(tf.expand_dims(a, 1), [1, tf.shape(b)[0], 1])
+		tile_a = tf.expand_dims(tile_a, 2)
+
+		tile_b = tf.tile(tf.expand_dims(b, 0), [tf.shape(a)[0], 1, 1])
+		tile_b = tf.expand_dims(tile_b, 2)
+
+		cartesian_product = tf.concat([tile_a, tile_b], axis=-1)
+
+		return cartesian_product
+
+
 
 	def build(self, input_shape):
 		# Create a trainable weight variable for this layer.
 		self.person = self.add_weight(name='people', 
 			shape=(self.person_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=0),
+			initializer='uniform',
 			# initializer='ones',
 			# regularizer=PD(),
 			trainable=True)
 
 		self.product = self.add_weight(name='product', 
 			shape=(self.product_count, self.style_width),
-			initializer=initializers.RandomUniform(minval=0, maxval=0),
+			initializer='uniform',
 			# initializer='ones',
 			# regularizer=PD(),
 			trainable=True)
 
-		# self.w1 = self.add_weight(name='w1', 
-		# 	shape=(1,),
-		# 	initializer='one',
+
+		# self.wc1 = self.add_weight(name='w1', 
+		# 	shape=(2, 1),
+		# 	initializer='glorot_uniform',
 		# 	trainable=True)
 
 		# self.b1 = self.add_weight(name='b1', 
+		# 	shape=(1, ),
+		# 	initializer='zero',
+		# 	trainable=True)
+
+		self.w1 = self.add_weight(name='w1', 
+			shape=(2 * self.style_width, 
+				   self.style_width),
+			initializer='glorot_uniform',
+			trainable=True)
+
+		# self.b1 = self.add_weight(name='b1', 
+		# 	shape=(self.style_width, ),
+		# 	initializer='zero',
+		# 	trainable=True)
+
+		self.w2 = self.add_weight(name='w2', 
+			shape=(self.style_width, 1),
+			initializer='glorot_uniform',
+			trainable=True)
+
+		# self.b2 = self.add_weight(name='b2', 
+		# 	shape=(1, ),
+		# 	initializer='zero',
+		# 	trainable=True)
+
+
+		# self.b3 = self.add_weight(name='b2', 
 		# 	shape=(1,),
 		# 	initializer='zero',
 		# 	trainable=True)
 
-		# self.w2 = self.add_weight(name='w2', 
+		# self.w3 = self.add_weight(name='m2', 
 		# 	shape=(1,),
 		# 	initializer='one',
 		# 	trainable=True)
 
-		# self.b2 = self.add_weight(name='b2', 
-		# 	shape=(1,),
-		# 	initializer='zero',
-		# 	trainable=True)
 
 		super(Adjacency, self).build(input_shape)  # Be sure to call this somewhere!
 
+	def jitter(self, idx=[0,1], var=0.2):
+		wts = self.get_weights()
+		
+		for i in idx:
+			wts[i] += np.random.normal(0, var, wts[i].shape)
+		
+		self.set_weights(wts)
+
 	def call(self, x):
+		return self.call_dense(x)
+
+	# 100pc test accuracy
+	def call_dot_softmax(self, x):
 		pr = self.product
 		pe = self.person
 
-		#pr = K.concatenate([
-		#	self.product,
-		#	1.0 - self.product
-		#], axis=1)
-		
-		#pe = K.concatenate([
-		#	self.person,
-		#	1.0 - self.person
-		#], axis=1)
+		pr = K.softmax(self.product)
+		pe = K.softmax(self.person)
 
-		wts = self.get_weights()
-		temp_pe = wts[0] + np.random.normal(0, 0.2, wts[0].shape)
-		temp_pr = wts[1] + np.random.normal(0, 0.2, wts[1].shape)
-		self.set_weights([np.array(temp_pe, dtype=np.float32), np.array(temp_pr, dtype=np.float32)])
+		m = K.dot(pr, K.transpose(pe))
+		m = (self.w3 * m) + self.b3
+		m = K.relu(m, alpha=0.1)
+
+		m = m * x
+
+		return m
+
+	# 100pc test accuracy
+	def call_dot(self, x):
+		pr = self.product
+		pe = self.person
+
+		m = K.dot(pr, K.transpose(pe))
+		m = m * x
+
+		return m
+
+	# Seen at 68% 1-accuracy test
+	def call_dense(self, x):
+		self.jitter(idx=[0,1], var=0.1)
+
+		pr = self.product
+		pe = self.person
+
+		pr = K.softmax(pr)
+		pe = K.softmax(pe)
+
+		all_pairs = self.cartesian_product_matrix(pr, pe)
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count, self.style_width * 2))
+
+		m = K.dot(flat, self.w1)
+		# m = K.bias_add(m, self.b1)
+		m = K.relu(m, alpha=0.1)
+
+		m = K.dropout(m, level=0.1)
+
+		m = K.dot(m, self.w2)
+		m = K.relu(m, alpha=0.1)
+
+		m = K.reshape(m, (1, self.product_count, self.person_count))
+		masked = m * x
+		return masked
 
 
-		proj = K.dot(pr, K.transpose(pe))# + self.noise
 
-		mul = proj * x
-		# mul = mul * self.w1 + self.b1
-		# mul = K.sigmoid(mul)
-		# mul = mul * self.w2 + self.b2
+	# 100pc test accuracy
+	def call_dense_conv(self, x):
+		self.jitter(idx=[0,1])
 
-		return mul
+		pr = self.product
+		pe = self.person
+
+		pr = K.softmax(pr)
+		pe = K.softmax(pe)
+
+		all_pairs = self.cartesian_product_matrix(pr, pe)
+
+		flat = K.reshape(all_pairs, (self.product_count * self.person_count * self.style_width, 2))
+		m = K.dot(flat, self.wc1)
+		m = K.tanh(m)
+
+		m = K.reshape(m, (self.product_count * self.person_count, self.style_width))
+		m = K.dot(m, self.w2)
+		m = K.relu(m, alpha=0.1)
+
+		m = K.reshape(m, (1, self.product_count, self.person_count))
+		masked = m * x
+		return masked
+
+
 
 	def compute_output_shape(self, input_shape):
 		return input_shape
+
+

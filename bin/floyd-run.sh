@@ -1,12 +1,12 @@
 #!/bin/bash
 
 floyd run  \
-	--data davidmack/datasets/review_from_all_hidden_random_walks/1:/data \
+	--data davidmack/datasets/graph_experiments/1:/data \
 	--env tensorflow-1.4 \
 	--gpu \
 	--tensorboard \
-	--message "See if NTM will train at all!" \
+	--message "adj dense with dropout" \
 	"ENVIRONMENT=floyd python train.py \
 	 	--output-dir /output \
 	 	--data-dir /data/ \
-	 	--epochs 50"
+	 	--epochs 100"

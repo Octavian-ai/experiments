@@ -64,7 +64,7 @@ class Model(object):
 
 
 		elif experiment.name == "review_from_hidden_style_neighbor_conv":
-			neighbors = Input(shape=(n_sequence,n_styles+2,), dtype='float32', name='neighbors')
+			neighbors = Input(shape=(n_sequence,n_styles*2,), dtype='float32', name='neighbors')
 			person = Input(shape=(n_styles,), dtype='float32', name='person')
 
 			m = cls.style_from_neighbors(neighbors, n_styles, n_sequence)
@@ -162,12 +162,12 @@ class Model(object):
 			style_width = experiment.header.params["style_width"]
 
 			adj_con = Input(batch_shape=(bs, pr_c, pe_c), dtype='float32', name="adj_con")
-			scores = Adjacency(pe_c, pr_c, style_width, name="hidden_to_adj")(adj_con)
+			features = Adjacency(pe_c, pr_c, style_width, name="hidden_to_adj")(adj_con)
 
-			model = keras.models.Model(inputs=[adj_con], outputs=[scores])
+			model = keras.models.Model(inputs=[adj_con], outputs=[features])
 
-			model.compile(loss=keras.losses.mean_absolute_error,
-				optimizer=keras.optimizers.Adam(lr=0.9, decay=0.01),
+			model.compile(loss=keras.losses.mean_squared_error,
+				optimizer=keras.optimizers.Adam(lr=0.2, decay=0.01),
 				metrics=['accuracy'])
 
 			return model
